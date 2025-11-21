@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!162 &1
+EditorUserSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 4
+  m_ConfigSettings:
+    GraphicsSettingsInspector_UserSettings:
+      value: 18134705175a055722080a3115371d4a0d55006876786860616b0471b8b07a68ffab74f9ee2a3a30300cea1a11320d0beb1a0c25f7060f494b4cc80018eb09361fc211cb1f862d19c51d19dcc413d6ade0d8ddfcddf9f4d9d29195fcfde6ebeae6f0a9c9afa6f8c5b89ff7a1aacececac4eba4d7c9d28bda
+      flags: 0
+    RecentlyUsedSceneGuid-0:
+      value: 5a08575f5207595a0f5d59741173094444164f7d7d2a23317c7a4465bbe1646d
+      flags: 0
+    RecentlyUsedSceneGuid-1:
+      value: 5a06055f570c585854585a7545770f484f15487d752e7235782d4461b2e5623b
+      flags: 0
+    RecentlyUsedSceneGuid-2:
+      value: 5052015407515a5d0b595a2144260c444e4f192c7f2b77352f7f4e6ab6e36539
+      flags: 0
+    RecentlyUsedSceneGuid-3:
+      value: 5457575f0003580d085c0e7a45750b4414151b7e2d7e73362c7a1e32e3b0656f
+      flags: 0
+    RecentlyUsedSceneGuid-4:
+      value: 5203035e5d065d5a58565d2111210944444f48287b7d2768297e4d61b7e63239
+      flags: 0
+    RecentlyUsedSceneGuid-5:
+      value: 0555010455515e0e5b0a092448775c44124f4a7d2a7c753378711c36b2e46c3a
+      flags: 0
+    RecentlyUsedSceneGuid-6:
+      value: 5403575e550d0c5e0b085b2443250c44404f1e2e7c787266782f4b64bae3653d
+      flags: 0
+    RecentlyUsedSceneGuid-7:
+      value: 540357555706505855080920147b5a44454e4b737c2e253129711831e3e1613b
+      flags: 0
+    vcSharedLogLevel:
+      value: 0d5e400f0650
+      flags: 0
+  m_VCAutomaticAdd: 1
+  m_VCDebugCom: 0
+  m_VCDebugCmd: 0
+  m_VCDebugOut: 0
+  m_SemanticMergeMode: 2
+  m_DesiredImportWorkerCount: 2
+  m_StandbyImportWorkerCount: 2
+  m_IdleImportWorkerShutdownDelay: 60000
+  m_VCShowFailedCheckout: 1
+  m_VCOverwriteFailedCheckoutAssets: 1
+  m_VCProjectOverlayIcons: 1
+  m_VCHierarchyOverlayIcons: 1
+  m_VCOtherOverlayIcons: 1
+  m_VCAllowAsyncUpdate: 1
+  m_VCScanLocalPackagesOnConnect: 1
+  m_ArtifactGarbageCollection: 1
+  m_CompressAssetsOnImport: 1
