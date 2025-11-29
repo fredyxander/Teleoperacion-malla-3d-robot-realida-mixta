@@ -298,6 +298,7 @@ public class TrackerRobot : MonoBehaviour
             yield return null;
         }
 
+        // último ajuste fino al final
         joint.SolveIKToTarget(goalPos, ikIterationsPerFrame * 3, ikStepAngleDeg * 0.5f);
         ikRoutine = null;
     }

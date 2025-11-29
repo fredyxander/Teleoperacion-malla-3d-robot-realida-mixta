@@ -24,7 +24,7 @@ public class EffectorMarker : MonoBehaviour
         else
             renderer.material.color = Color.blue; // fallback
 
-        // Collider (si quieres)
+        // Collider
         SphereCollider col = sphere.GetComponent<SphereCollider>();
         col.radius = 0.5f;
     }
