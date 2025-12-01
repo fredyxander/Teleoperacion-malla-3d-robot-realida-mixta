@@ -4,7 +4,7 @@ public class TargetMarker : MonoBehaviour
 {
     public Material targetMaterial;
     public Vector3 localOffset = new Vector3(0.25f, -0.23f, 0f); // derecha, abajo
-    public float sphereSize = 0.05f; // 5 cm
+    public float sphereSize = 0.04f; // 4 cm
 
     void Start()
     {

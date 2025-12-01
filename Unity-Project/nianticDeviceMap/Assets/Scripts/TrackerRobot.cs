@@ -247,10 +247,21 @@ public class TrackerRobot : MonoBehaviour
         targetSphereInstance.transform.position = worldPos;
 
         Debug.Log($"✔ Nuevo target colocado en: {worldPos}");
+        StartCoroutine(DebugAfterPlacement());
 
-        if (autoStartIK)
-            StartIKMoveToTarget();
+        //if (autoStartIK)
+        //    StartIKMoveToTarget();
     }
+
+    private IEnumerator DebugAfterPlacement()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            Debug.Log($"Frame {i} target pos: {targetSphereInstance.transform.position}");
+            yield return null;
+        }
+    }
+
 
     private void CreateTargetSphereWorld()
     {
