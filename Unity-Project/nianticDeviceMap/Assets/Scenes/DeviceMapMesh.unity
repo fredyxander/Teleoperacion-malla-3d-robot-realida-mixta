@@ -4978,6 +4978,7 @@ MonoBehaviour:
   urlInputField: {fileID: 539140778}
   connectionStatusText: {fileID: 1473117425}
   uiRobotManager: {fileID: 845900764}
+  tracker: {fileID: 1731036371}
 --- !u!4 &1661015572
 Transform:
   m_ObjectHideFlags: 0
@@ -5199,6 +5200,7 @@ MonoBehaviour:
   ikIterationsPerFrame: 3
   ikMoveDuration: 3
   currentMode: 0
+  wsWorker: {fileID: 1661015571}
 --- !u!1 &1752209910
 GameObject:
   m_ObjectHideFlags: 0

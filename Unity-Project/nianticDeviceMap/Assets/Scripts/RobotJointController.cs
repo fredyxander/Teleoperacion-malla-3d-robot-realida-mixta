@@ -5,12 +5,7 @@ using System.Collections;
 public class RobotJointController : MonoBehaviour
 {
     [Header("UR3 Links (autodetect)")]
-    public Transform link1;
-    public Transform link2;
-    public Transform link3;
-    public Transform link4;
-    public Transform link5;
-    public Transform link6;
+    public Transform link1, link2, link3, link4, link5, link6;
 
     [Header("End Effector (opcional, por defecto Link6)")]
     public Transform endEffector;
@@ -31,7 +26,6 @@ public class RobotJointController : MonoBehaviour
         link4 = link3.Find("Link4");
         link5 = link4.Find("Link5");
         link6 = link5.Find("Link6");
-
         if (endEffector == null)
             endEffector = link6;
 

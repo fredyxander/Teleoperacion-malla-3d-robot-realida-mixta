@@ -42,6 +42,7 @@ public static class AnchorPoseStorage
 
         var json = File.ReadAllText(FilePath);
         var data = JsonUtility.FromJson<AnchorPoseData>(json);
+        Debug.Log($"[AnchorPoseStorage] Cargado offset local desde {FilePath} {data}");
 
         pos = data.ToPosition();
         rot = data.ToRotation();

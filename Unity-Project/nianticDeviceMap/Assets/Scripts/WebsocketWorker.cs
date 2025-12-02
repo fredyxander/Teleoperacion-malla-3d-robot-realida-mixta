@@ -1,8 +1,9 @@
+using NativeWebSocket;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using TMPro;
-using NativeWebSocket;
+using UnityEngine;
 
 public class WebsocketWorker : MonoBehaviour
 {
@@ -16,6 +17,9 @@ public class WebsocketWorker : MonoBehaviour
     [Header("UI Status")]
     public TextMeshProUGUI connectionStatusText;     // Texto estado de conexión del servidor
     public RobotCommands uiRobotManager;  // referencia al script RobotCommands
+
+    // Referencia opcional (si quieres arrastrarlo desde Unity)
+    public TrackerRobot tracker;
 
     // Actualiza la URL desde el InputField (SOLO INTERNO)
     private void UpdateURLFromInput()
@@ -99,6 +103,17 @@ public class WebsocketWorker : MonoBehaviour
         {
             Debug.Log("Conectado al servidor WebSocket");
             UpdateConnectionStatus("Robot Conectado", Color.green);
+
+            var tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
+            if (tracker != null)
+            {
+                tracker.SendRobotBasePoseToPython();      // 1) base pose
+                tracker.SendCurrentDigitalTCPToPython();  // 2) digital tcp
+            }
+            else
+            {
+                Debug.LogWarning("[WS] No encontré TrackerRobot para enviar TCP/base pose.");
+            }
         };
 
         ws.OnMessage += (bytes) =>
@@ -108,12 +123,7 @@ public class WebsocketWorker : MonoBehaviour
             string msg = System.Text.Encoding.UTF8.GetString(bytes);
             Debug.Log("Mensaje recibido desde server py: " + msg);
 
-
-            if (msg == "home_reached")
-            {
-                uiRobotManager.UpdateJointStatus("Robot in Home", Color.green);
-            }
-
+            HandleIncomingMessage(msg);
         };
 
         ws.OnError += (e) =>
@@ -131,6 +141,9 @@ public class WebsocketWorker : MonoBehaviour
             Debug.Log("Conexión cerrada");
             UpdateConnectionStatus("Robot Desconectado", Color.gray);
         };
+
+        // Este Update() especial SÍ es necesario para Quest
+        InvokeRepeating(nameof(DispatchMessages), 0f, 0.01f);
 
         ws.Connect();
 
@@ -154,6 +167,11 @@ public class WebsocketWorker : MonoBehaviour
 
             yield return null;
         }
+    }
+
+    private void DispatchMessages()
+    {
+        ws?.DispatchMessageQueue();
     }
 
     // Método para desconectar servidor websocket
@@ -184,6 +202,7 @@ public class WebsocketWorker : MonoBehaviour
     //Metodo para enviar comando a robot
     public async void SendCommand(string cmd)
     {
+        Debug.Log($"sending {ws}");
         if (ws != null && ws.State == WebSocketState.Open)
         {
             await ws.SendText(cmd);
@@ -194,6 +213,57 @@ public class WebsocketWorker : MonoBehaviour
             Debug.LogWarning("No conectado al servidor WebSocket");
             UpdateConnectionStatus("Robot desconectado", Color.gray);
         }
+    }
+
+    // =====================================================
+    //           PARSE DE MENSAJES DESDE PYTHON
+    // =====================================================
+    private void HandleIncomingMessage(string msg)
+    {
+        if (msg == "home_reached")
+        {
+            uiRobotManager.UpdateJointStatus("Robot in Home", Color.green);
+            return;
+        }
+
+        try
+        {
+            // Intentar parsear IK solution
+            IKSolution data = JsonUtility.FromJson<IKSolution>(msg);
+
+            if (data != null && data.type == "ik_solution")
+            {
+                Debug.Log("$[WS] Solución IK recibida {data}");
+
+                if (data.type == "robot_tcp")
+                {
+                    Debug.Log($"[UNITY] TCP real: ({data.tcp_pos[0]}, {data.tcp_pos[1]}, {data.tcp_pos[2]})");
+                }
+
+                if (tracker == null)
+                    tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
+
+                if (tracker != null)
+                    tracker.OnIkSolutionReceived(data.q);
+
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[WS] No se pudo parsear JSON: " + ex);
+        }
+    }
+
+    // =====================================================
+    //                   CLASES JSON
+    // =====================================================
+    [Serializable]
+    public class IKSolution
+    {
+        public string type;
+        public float[] q;
+        public float[] tcp_pos;
     }
 
     private void Update()

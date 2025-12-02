@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\Repos\3D-Scann-Mesh-UR\.venv"
+VIRTUAL_ENV="E:\Repos\Teleoperacion-malla-3d-robot-realida-mixta\.venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

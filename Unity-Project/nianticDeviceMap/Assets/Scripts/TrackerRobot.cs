@@ -55,6 +55,8 @@ public class TrackerRobot : MonoBehaviour
     public RobotMode currentMode = RobotMode.None;
     public Action<bool> OnTrackingReady;
 
+    public WebsocketWorker wsWorker;  // referencia al script websocketWorker
+
     // =======================================================================
     // START
     // =======================================================================
@@ -142,6 +144,7 @@ public class TrackerRobot : MonoBehaviour
         }
 
         deviceMap = ARDeviceMap.CreateFromSerializedData(File.ReadAllBytes(path));
+        Debug.Log("✔ DeviceMap cargado desde: " + path + deviceMap);
         StartCoroutine(RestartTrackingRoutine());
     }
 
@@ -249,8 +252,8 @@ public class TrackerRobot : MonoBehaviour
         Debug.Log($"✔ Nuevo target colocado en: {worldPos}");
         StartCoroutine(DebugAfterPlacement());
 
-        //if (autoStartIK)
-        //    StartIKMoveToTarget();
+        if (autoStartIK)
+            StartIKMoveToTarget();
     }
 
     private IEnumerator DebugAfterPlacement()
@@ -261,7 +264,6 @@ public class TrackerRobot : MonoBehaviour
             yield return null;
         }
     }
-
 
     private void CreateTargetSphereWorld()
     {
@@ -277,43 +279,147 @@ public class TrackerRobot : MonoBehaviour
     // =======================================================================
     public void StartIKMoveToTarget()
     {
-        if (joint == null ||
-            effectorSphereTransform == null ||
-            targetSphereTransform == null)
+        if (joint == null || targetSphereInstance == null)
         {
-            Debug.LogWarning("No se puede iniciar IK: faltan referencias.");
+            Debug.LogWarning("No se puede pedir IK: faltan referencias");
             return;
         }
 
-        if (ikRoutine != null)
-            StopCoroutine(ikRoutine);
+        // ---- 1) POSICIÓN EN UNITY WORLD ----
+        Vector3 p_world = targetSphereInstance.transform.position;
+        Quaternion r = targetSphereInstance.transform.rotation;
 
-        ikRoutine = StartCoroutine(IKMoveEffectorToTarget());
+        // ---- 2) POSICIÓN DESDE LA BASE DEL ROBOT ----
+        Transform baseTf = joint.link1.parent;
+        Vector3 p_base = baseTf.InverseTransformPoint(p_world);
+
+        // ---- 3) CONVERSIÓN UNIDAD UNITY → UR ----
+        Vector3 p_ur;
+        p_ur.x = p_base.z;
+        p_ur.y = p_base.x;
+        p_ur.z = p_base.y;
+
+        // LOGS PARA COMPARAR EN PYTHON
+        Debug.Log($"[UNITY] Target World = {p_world}");
+        Debug.Log($"[UNITY] Target Local (Base) = {p_base}");
+        Debug.Log($"[UNITY] Target Converted (UR frame) = {p_ur}");
+
+        // Mensaje simple en JSON
+        // ---- 4) ENVIAR A PYTHON ----
+        IKRequestMsg msg = new IKRequestMsg();
+        msg.type = "ik_request";
+        msg.position = new float[] { p_ur.x, p_ur.y, p_ur.z };
+        msg.rotation = new float[] { 0, 0, 0, 1 };
+        string json = JsonUtility.ToJson(msg);
+
+        wsWorker.SendCommand(json);
+
+        Debug.Log($"[UNITY] JSON enviado a Python: {json}");
     }
 
-    private IEnumerator IKMoveEffectorToTarget()
+    [System.Serializable]
+    public class IKRequestMsg
     {
-        Vector3 startPos = effectorSphereTransform.position;
-        Vector3 goalPos = targetSphereTransform.position;
+        public string type;
+        public float[] position;
+        public float[] rotation;
+    }
 
-        float elapsed = 0f;
+    // Este método lo llamará tu cliente WebSocket cuando Python
+    // devuelva la solución de IK:
+    public void OnIkSolutionReceived(float[] q)
+    {
+        if (joint != null && q != null && q.Length == 6)
+            joint.ApplyJointAngles(q);
+    }
 
-        while (elapsed < ikMoveDuration)
+    [System.Serializable]
+    public class BasePoseReport
+    {
+        public string type = "base_pose";
+        public float[] position;
+        public float[] rotation;
+    }
+
+    public void SendRobotBasePoseToPython()
+    {
+        if (joint == null)
         {
-            float t = Mathf.Clamp01(elapsed / ikMoveDuration);
-            Vector3 intermediate = Vector3.Lerp(startPos, goalPos, t);
-
-            joint.SolveIKToTarget(intermediate, ikIterationsPerFrame, ikStepAngleDeg);
-
-            elapsed += Time.deltaTime;
-            yield return null;
+            Debug.LogWarning("[TrackerRobot] No hay joint controller.");
+            return;
         }
 
-        // último ajuste fino al final
-        joint.SolveIKToTarget(goalPos, ikIterationsPerFrame * 3, ikStepAngleDeg * 0.5f);
-        ikRoutine = null;
+        Transform baseTf = joint.link1.parent;
+
+        Vector3 p_world = baseTf.position;
+        Quaternion q_world = baseTf.rotation;
+
+        BasePoseReport msg = new BasePoseReport
+        {
+            position = new float[] { p_world.x, p_world.y, p_world.z },
+            rotation = new float[] { q_world.x, q_world.y, q_world.z, q_world.w }
+        };
+
+        string json = JsonUtility.ToJson(msg);
+        wsWorker.SendCommand(json);
+
+        Debug.Log("[UNITY] Envié base_pose → Python: " + json);
     }
 
+
+
+    [System.Serializable]
+    public class DigitalTCPReport
+    {
+        public string type;
+        public float[] position;
+        public float[] rotation;
+    }
+
+    public void SendCurrentDigitalTCPToPython()
+    {
+        if (effectorSphereTransform == null || joint == null)
+        {
+            Debug.LogWarning("[TrackerRobot] No hay effector o joint.");
+            return;
+        }
+
+        // 1. World space
+        Vector3 p_world = effectorSphereTransform.position;
+
+        // 2. Local relative to base
+        Transform baseTf = joint.link1.parent;
+        Vector3 p_local = baseTf.InverseTransformPoint(p_world);
+
+        // 3. Convert local → UR frame (usa tu conversión actual)
+        Vector3 p_ur;
+        p_ur.x = p_local.z;
+        p_ur.y = -p_local.x;   // o sin el menos, según calibración
+        p_ur.z = p_local.y;
+
+        // Debug.Log($"[UNITY TCP] Digital TCP world = {p_world}");
+        // Debug.Log($"[UNITY TCP] Digital TCP local = {p_local}");
+        // Debug.Log($"[UNITY TCP] Digital TCP URframe = {p_ur}");
+
+        Quaternion q_world = effectorSphereTransform.rotation;
+
+        // convertir a marco local de la base
+        Quaternion q_local = Quaternion.Inverse(baseTf.rotation) * q_world;
+
+        // convertir a rotación UR (porque Unity usa Y-up)
+        Quaternion q_ur = new Quaternion(q_local.z, -q_local.x, q_local.y, q_local.w); // misma conversión de pos
+
+        DigitalTCPReport msg = new DigitalTCPReport {
+            type = "digital_tcp",
+            position = new float[]{ p_ur.x, p_ur.y, p_ur.z },
+            rotation = new float[]{ q_ur.x, q_ur.y, q_ur.z, q_ur.w }
+        };
+
+        string json = JsonUtility.ToJson(msg);
+        wsWorker.SendCommand(json);
+
+        Debug.Log("[UNITY] Envié digital_tcp → Python");
+    }
     private void StopIKMove()
     {
         if (ikRoutine != null)

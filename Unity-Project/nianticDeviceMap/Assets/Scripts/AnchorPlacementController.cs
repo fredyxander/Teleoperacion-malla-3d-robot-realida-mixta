@@ -46,14 +46,17 @@ public class AnchorPlacementController : MonoBehaviour
     void Update()
     {
         if (!tracker.HasAnchorTracking())
+        {
+            Debug.Log("[AnchorPlacement] No hay tracking de ancla disponible.");
             return;
+        }
 
         if (!hasRightHand || !rightHand.isValid)
             GetRightHandDevice();
 
         bool bPressed = false;
 
-        // Bot?n B
+        // Boton B
         if (hasRightHand && rightHand.TryGetFeatureValue(CommonUsages.secondaryButton, out bPressed))
         {
             if (bPressed && !lastBPressed)
@@ -122,14 +125,18 @@ public class AnchorPlacementController : MonoBehaviour
     private void OnBPressed()
     {
         if (!rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        {
+            Debug.Log("[AnchorPlacement] No se detect? impacto al presionar B.");
             return;
+        }
 
         Transform anchor = tracker.AnchorTransform;
+        Debug.Log($"[AnchorPlacement] {anchor}");
 
-        // 1. POSICI?N
+        // 1. POSICION
         pendingLocalPos = anchor.InverseTransformPoint(hit.point);
 
-        // 2. ROTACI?N ? SIEMPRE PARALELA AL PISO
+        // 2. ROTACION ? SIEMPRE PARALELA AL PISO
         Vector3 fwd = Camera.main.transform.forward;
 
         // Evitar casos donde forward es casi vertical
@@ -153,7 +160,7 @@ public class AnchorPlacementController : MonoBehaviour
         Debug.Log($"[AnchorPlacement] Preview colocado en: {hit.point}");
     }
 
-    // Llamado por el bot?n Confirmar en UI
+    // Llamado por el boton Confirmar en UI
     public void ConfirmPlacement()
     {
         if (!hasPendingPose)
@@ -162,7 +169,7 @@ public class AnchorPlacementController : MonoBehaviour
             return;
         }
 
-        // Reproducir sonido de confirmaci?n sin AudioSource
+        // Reproducir sonido de confirmacion sin AudioSource
         if (successDing != null)
         {
             AudioSource.PlayClipAtPoint(successDing, Camera.main.transform.position, 1f);
@@ -172,6 +179,6 @@ public class AnchorPlacementController : MonoBehaviour
 
         hasPendingPose = false;
 
-        Debug.Log("[AnchorPlacement] Posici?n del robot confirmada y guardada.");
+        Debug.Log("[AnchorPlacement] Posicion del robot confirmada y guardada.");
     }
 }
