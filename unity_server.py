@@ -2,30 +2,49 @@ import asyncio
 import websockets
 import json
 import numpy as np
-from ikpy.chain import Chain
 from scipy.spatial.transform import Rotation as R
 
-# Importar el archivo de cinemática (aún sin usar)
-# from kinematics_ur3 import move_cartesian_smooth, get_tcp_real
-# Más adelante activaremos esto cuando tengamos mapeo Unity→UR3
-# De momento solo los dejamos importados pero comentados
+# Importar controlador del UR3
+from kinematics_ur3 import UR3Controller
 
-# =========================================
-# VARIABLES GLOBALES
-# =========================================
+# ------------------------------------------------------
+# INICIALIZAR CONTROLADOR DEL ROBOT
+# ------------------------------------------------------
+ROBOT_IP = "192.168.0.4"
+ur3 = UR3Controller(ROBOT_IP)
+
+# Variables globales
 unity_base_pos = None
 unity_base_rot = None
 
 unity_tcp_pos = None
 unity_tcp_rot = None
 
-ursim_tcp_pos = None
-ursim_tcp_rot = None
-
+pos_offset = None
+rot_offset = None
 calibration_ready = False
 
-rot_offset = None
-pos_offset = None
+
+# -------------------------------------------------------------
+# 🔵 CONVERSIÓN POSICIONES UNITY → UR3
+# -------------------------------------------------------------
+def unity_to_ur3(pos_u):
+    global rot_offset, pos_offset, calibration_ready
+
+    if not calibration_ready:
+        print("❌ ERROR: la calibración no está lista.")
+        return None
+
+    pos_u = np.array(pos_u)
+
+    # 1. Aplicar rotación de calibración
+    p_rot = rot_offset.apply(pos_u)
+
+    # 2. Aplicar offset de posición
+    p_corr  = p_rot + pos_offset
+
+    return p_corr
+
 
 # -------------------------------------------------------------
 # LOGGING
@@ -34,103 +53,125 @@ def log(msg):
     print(f"[UNITY SERVER] {msg}")
 
 
-# =========================================
-# RECIBIR BASE POSE
-# =========================================
+# -------------------------------------------------------------
+# PROCESAR POSE DE LA BASE
+# -------------------------------------------------------------
 def handle_base_pose(data):
     global unity_base_pos, unity_base_rot
 
-    p = data["position"]
-    q = data["rotation"]
+    unity_base_pos = np.array(data["position"])
+    unity_base_rot = np.array(data["rotation"])
 
-    unity_base_pos = np.array(p)
-    unity_base_rot = np.array(q)
-
-    log(f"Unity BASE Pose → pos={p}, rot={q}")
+    log(f"BASE Pose (Unity) = {unity_base_pos}, rot={unity_base_rot}")
 
 
-# =========================================
-# RECIBIR DIGITAL TCP
-# =========================================
-def handle_digital_tcp(data):
+# -------------------------------------------------------------
+# PROCESAR DIGITAL TCP Y CALIBRAR
+# -------------------------------------------------------------
+def handle_digital_tcp_and_calibrate(data):
     global unity_tcp_pos, unity_tcp_rot
+    global pos_offset, rot_offset, calibration_ready
 
-    p = data["position"]
-    q = data["rotation"]
+    unity_tcp_pos = np.array(data["position"])
+    unity_tcp_rot = np.array(data["rotation"])
 
-    unity_tcp_pos = np.array(p)
-    unity_tcp_rot = np.array(q)
+    log(f"DIGITAL TCP (Unity) = {unity_tcp_pos}")
 
-    log(f"Unity DIGITAL TCP → pos={p}, rot={q}")
+    # -----------------------------
+    # Obtener TCP real del UR3
+    # -----------------------------
+    real_pos, real_rot = ur3.get_tcp_real()
+    log(f"REAL TCP (UR3) = {real_pos}")
 
-# =========================================
-# FUNCIÓN: intentar calibrar si es posible
-# =========================================
-def attempt_calibration():
-    global calibration_ready, pos_offset, rot_offset
-
-    if unity_tcp_pos is None or unity_tcp_rot is None:
-        return False
-
-    if ursim_tcp_pos is None or ursim_tcp_rot is None:
-        return False
-
-    # --- Rotación ---
+    # -----------------------------
+    # CALIBRACIÓN DE ROTACIÓN
+    # -----------------------------
     unity_R = R.from_quat(unity_tcp_rot)
-    real_R = R.from_rotvec(ursim_tcp_rot)  # URSim da rotvec
+    real_R = R.from_rotvec(real_rot)   # UR usa rotvec (Rx, Ry, Rz)
 
     rot_offset = real_R * unity_R.inv()
 
-    # --- Posición ---
-    pos_offset = ursim_tcp_pos - rot_offset.apply(unity_tcp_pos)
+    # -----------------------------
+    # CALIBRACIÓN DE TRASLACIÓN
+    # -----------------------------
+    pos_offset = real_pos - rot_offset.apply(unity_tcp_pos)
 
     calibration_ready = True
 
-    log("\n======= 🔧 CALIBRACIÓN COMPLETA =======")
-    log(f"Rot Offset (quat) = {rot_offset.as_quat().tolist()}")
-    log(f"Pos Offset (m)    = {pos_offset}")
-    log("=====================================\n")
+    log("======= CALIBRACIÓN COMPLETA =======")
+    log(f"rot_offset = {rot_offset.as_quat().tolist()}")
+    log(f"pos_offset = {pos_offset}")
+    log("=====================================")
 
-    return True
+    return
 
-# =========================================
-# PROCESAR MENSAJE JSON DESDE UNITY
-# =========================================
+async def handle_target(data):
+    """Procesa un target enviado desde Unity, convierte al marco UR3 y ejecuta movimiento IK."""
+
+    if not calibration_ready:
+        print("❌ No se puede procesar target: calibración NO lista.")
+        return
+
+    # -----------------------------
+    # 1) Leer target desde Unity
+    # -----------------------------
+    target_unity = np.array(data["position"], dtype=float)
+    print("\n🎯 TARGET (Unity) =", target_unity)
+
+    # -----------------------------
+    # 2) Convertir a coordenadas UR3
+    # -----------------------------
+    target_ur = unity_to_ur3(target_unity)
+    target_ur = np.array(target_ur, dtype=float).reshape(3,)
+    print("➡ TARGET Convertido (UR3) =", target_ur)
+
+    # -----------------------------
+    # 3) Mover robot usando IK suave
+    # -----------------------------
+    print("\n🤖 Ejecutando movimiento IK...")
+    ur3.move_cartesian_smooth(target_ur)
+
+    # -----------------------------
+    # 4) Medir TCP final tras el movimiento
+    # -----------------------------
+    tcp_real, _ = ur3.get_tcp_real()
+    print("📍 TCP REAL después del movimiento =", tcp_real)
+
+    # -----------------------------
+    # 5) Calcular error
+    # -----------------------------
+    err = tcp_real - target_ur
+    print("📏 Error final =", err)
+
+    # Enviar de vuelta a Unity
+
+    print("--------------------------------------------------\n")
+
+# -------------------------------------------------------------
+# PROCESAR MENSAJES UNITY
+# -------------------------------------------------------------
 async def process_message(websocket, data):
-    global calibration_ready
-
     msg_type = data.get("type")
 
-    # ---------------------------
-    # Mensaje base_pose
-    # ---------------------------
     if msg_type == "base_pose":
         handle_base_pose(data)
         return
 
-    # ---------------------------
-    # Mensaje digital_tcp
-    # ---------------------------
     if msg_type == "digital_tcp":
-        handle_digital_tcp(data)
-
-        if attempt_calibration():
-            log("💡 Calibración lista. Unity ↔ UR3 alineados.")
-        else:
-            log("Esperando datos reales del robot para calibrar…")
-
+        handle_digital_tcp_and_calibrate(data)
         return
 
-    # ---------------------------
-    # Mensajes desconocidos
-    # ---------------------------
-    log(f"Mensaje desconocido: {data}")
+    if msg_type == "ik_request":
+        await handle_target(data)
+        return
+
+    log("⚠ Mensaje desconocido recibido.")
 
 
-# =========================================
-# SERVIDOR WEBSOCKET
-# =========================================
-async def client_handler(websocket,  path=None):
+# -------------------------------------------------------------
+# HANDLER DE CLIENTE UNITY
+# -------------------------------------------------------------
+async def client_handler(websocket, path=None):
     log("Unity conectado.")
 
     try:
@@ -142,7 +183,7 @@ async def client_handler(websocket,  path=None):
                 await process_message(websocket, data)
 
             except json.JSONDecodeError:
-                log("⚠ Mensaje NO es JSON válido.")
+                log("⚠ ERROR: mensaje no es JSON válido.")
 
     except websockets.exceptions.ConnectionClosedOK:
         log("Unity desconectado.")
@@ -151,29 +192,22 @@ async def client_handler(websocket,  path=None):
         log("Conexión finalizada con Unity.")
 
 
-# 🔹 LÓGICA PRINCIPAL DEL ROBOT (125 Hz)
-async def motion_loop():
-    global current_cmd
-
-
-# Cada vez que un cliente se conecta, llama a handle_client.
-# Mientras tanto, arranca el bucle motion_loop que sigue mandando comandos a UR según el estado.
-# Servidor WebSocket + motion loop
+# -------------------------------------------------------------
+# SERVIDOR PRINCIPAL
+# -------------------------------------------------------------
 async def main():
     WS_SERVER_IP = "192.168.0.3"
-    port = 8765
+    PORT = 8765
 
     print("=====================================")
-    print("🟢 Servidor WebSocket corriendo para Quest")
-    print(f"   url para meta quest: ws://{WS_SERVER_IP}:{port}")
+    print("🟢 Servidor WebSocket para Quest listo")
+    print(f"  Conectarse vía: ws://{WS_SERVER_IP}:{PORT}")
     print("=====================================")
 
-    async with websockets.serve(client_handler, WS_SERVER_IP, port):
+    async with websockets.serve(client_handler, WS_SERVER_IP, PORT):
         log("Servidor listo. Esperando conexiones...")
-        # await motion_loop( )# mantiene el bucle vivo
-        await asyncio.Future()  # keep alive forever
+        await asyncio.Future()  # Mantener vivo
 
-# Arranca el programa asíncrono.
-# Lanza tanto el servidor WebSocket como el bucle de control del robot.
+
 if __name__ == "__main__":
-  asyncio.run(main())
+    asyncio.run(main())

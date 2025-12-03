@@ -6,209 +6,212 @@ from ikpy.chain import Chain
 from scipy.spatial.transform import Rotation as R
 import rtde_receive
 
-# -----------------------------------------------------
-# CONFIGURACIÓN ROBOT
-# -----------------------------------------------------
-ROBOT_IP = "192.168.0.4"
-RTDE_PORT = 30004
-SOCKET_PORT = 30002
+class UR3Controller:
+    def __init__(self, ip="192.168.0.4"):
+        self.ROBOT_IP = ip
+        self.rtde_r = None
+        self.socket = None
+        self.RTDE_PORT = 30004
+        self.SOCKET_PORT = 30002
+        self.URDF_PATH = "robot_models/ur3.urdf"
+        self.joint_indices = []
 
-# -----------------------------------------------------
-# CARGAR CADENA IKPY (URDF)
-# -----------------------------------------------------
-URDF_PATH = "robot_models/ur3.urdf"
-# Cargar URDF con versión de IKPy que no soporta argumentos extra
-ur3_chain = Chain.from_urdf_file(URDF_PATH)
+        print("[UR] Inicializando UR3Controller...")
+        self.connect_rtde()
+        self.connect_socket()
+        self.load_urdf()
 
-print(f"[IK] Cadena IKPy cargada. Total links: {len(ur3_chain.links)}")
-
-# Descubrir índices de articulaciones reales del UR3
-joint_indices = []
-for idx, link in enumerate(ur3_chain.links):
-    if link.joint_type == "revolute":
-        joint_indices.append(idx)
-
-print(f"[IK] Joints activos detectados: {joint_indices}")
-
-joint_indices = [2, 3, 4, 5, 6, 7]  # articulaciones reales del UR3
-
-print(f"[IK] Cadena IKPy cargada. DOF detectados: {len(joint_indices)}\n")
-
-print("=== Links detectados ===")
-for i, link in enumerate(ur3_chain.links):
-    print(f"{i}: name={link.name}, joint_type={link.joint_type}")
-print("")
-
-
-# -----------------------------------------------------
-# LÍMITES DE SEGURIDAD (en radianes)
-# -----------------------------------------------------
-SAFE_LIMITS = [
-    (-2.8, 2.8),     # joint1
-    (-2.0, -0.1),    # joint2 (evita singularidad codo arriba)
-    (-2.8, 2.8),     # joint3
-    (-3.0, 3.0),     # joint4
-    (-2.0, 2.0),     # joint5
-    (-3.0, 3.0)      # joint6
-]
-
-def clamp_joint_limits(q):
-    """Recorta cada articulación a los límites de seguridad."""
-    q_safe = []
-    for i, angle in enumerate(q):
-        low, high = SAFE_LIMITS[i]
-        q_safe.append(max(low, min(high, angle)))
-    return np.array(q_safe)
-
-
-# -----------------------------------------------------
-# RTDE Y SOCKET SCRIPT
-# -----------------------------------------------------
-print("[UR] Conectando RTDE (lectura de estados)...")
-rtde_r = rtde_receive.RTDEReceiveInterface(ROBOT_IP)
-
-# -----------------------------------------
-# 1. CONEXIÓN A UR3 — SOCKET (envío scripts)
-# -----------------------------------------
-print("[UR] Conectando Socket Script (envío de comandos)...")
-try:
-  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  sock.connect((ROBOT_IP, SOCKET_PORT))
-  print(f"[UR] Conectado a Robot(Socket) - Envio: {ROBOT_IP}:{SOCKET_PORT}")
-except Exception as e:
-  print(f"[UR] Error conectando a UR(Socket) - Envio: {e}")
-  raise
-
-# -----------------------------------------------------
-# LECTURA DEL TCP REAL
-# -----------------------------------------------------
-def get_tcp_real():
-    tcp = rtde_r.getActualTCPPose()
-    return np.array([tcp[0], tcp[1], tcp[2]])
-
-# -----------------------------------------------------
-# ESPERAR A QUE EL ROBOT SE DETENGA
-# -----------------------------------------------------
-def wait_robot_stopped(threshold=0.001):
-    while True:
-        speed = np.linalg.norm(rtde_r.getActualTCPSpeed()[0:3])
-        if speed < threshold:
-            break
-        time.sleep(0.02)
-
-
-# -----------------------------------------------------
-# POSICIÓN SEGURA DE ALINEACIÓN
-# -----------------------------------------------------
-SAFE_ALIGN_Q = [
-    0.0,
-    -math.pi/2,
-    0.0,
-    -math.pi/2,
-    0.0,
-    0.0
-]
-HOME_POINT_CMD = "movej([0, -1.57, 0, -1.57, 0, 0], a=1.0, v=0.5)\n"
-
-def move_safe_align():
-    print("\n[SAFE] Moviendo a ALIGN SAFE POSE...")
-    # cmd = (
-    #     f"movej([{','.join(map(str,SAFE_ALIGN_Q))}], a=0.5, v=0.2)\n"
-    # )
-    # sock.send(cmd.encode())
-    sock.send(HOME_POINT_CMD.encode())
-    wait_robot_stopped()
-    print("[SAFE] Robot en pose segura.\n")
-
-
-# -----------------------------------------------------
-# MOVIMIENTO CARTESIANO SUAVE (trayectoria A → B)
-# -----------------------------------------------------
-def move_cartesian_smooth(target_xyz, steps=60):
-    """
-    Movimiento seguro:
-    ✔ Interpolación lineal
-    ✔ IKPy con orientación del TCP hacia abajo
-    ✔ Límites de seguridad
-    ✔ Envío suave moveJ
-    """
-
-    print("=== MOVIMIENTO SUAVE CON ORIENTACIÓN FIJA ===")
-
-    p_start = get_tcp_real()
-    p_end = np.array(target_xyz)
-
-    print(f"Posición inicial (TCP): {p_start}")
-    print(f"Target deseado       : {p_end}")
-
-    # Orientación fija del TCP apuntando hacia abajo
-    R_fixed = R.from_euler("xyz", [math.pi, 0, 0]).as_matrix()
-
-    # Generar trayectoria interpolada
-    path = [
-        p_start + (p_end - p_start) * (i / steps)
-        for i in range(1, steps + 1)
-    ]
-
-    for i, p in enumerate(path):
-        print(f"[{i+1}/{steps}] Resolviendo IK hacia {p}")
-
-        # IK con orientación fija
-        sol = ur3_chain.inverse_kinematics(
-            target_position=p.tolist(),
-            target_orientation=R_fixed,
-            orientation_mode="all"
-        )
-
-        q = sol[joint_indices]  # convertir IKPy → UR3 real
-        q = clamp_joint_limits(q)
-
-        # Enviar movimiento suave
-        cmd = f"movej([{','.join(map(str,q))}], a=0.5, v=0.6)\n"
-        sock.send(cmd.encode())
-
-        time.sleep(0.05)
-
-    wait_robot_stopped()
-
-    # Evaluación final del movimiento
-    tcp_final = get_tcp_real()
-    err = tcp_final - p_end
-
-    print("\n===== FIN MOVIMIENTO SUAVE =====")
-    print("TCP REAL FINAL:", tcp_final)
-    print("TARGET:", p_end)
-    print(f"ERROR FINAL: dx={err[0]:.4f}, dy={err[1]:.4f}, dz={err[2]:.4f}")
-    print("================================\n")
-
-
-# =====================================================
-# PROGRAMA PRINCIPAL
-# =====================================================
-if __name__ == "__main__":
-
-    move_safe_align()
-
-    print("\n=== CONTROL CARTESIANO MULTI-TARGET ===")
-    print("Ingresa coordenadas X Y Z en metros (UR frame).")
-    print("Ejemplo:   0.2 -0.1 0.5")
-    print("Escribe 'exit' para salir.\n")
-
-    while True:
-        user = input("Target XYZ > ")
-
-        if user.strip().lower() == "exit":
-            break
-
+    # ----------------------------------------------------------
+    # CONEXIÓN RTDE (lectura de estados del robot)
+    # ----------------------------------------------------------
+    def connect_rtde(self):
         try:
-            x, y, z = map(float, user.split())
-        except:
-            print("Formato inválido. Usa: x y z")
-            continue
+            print("[UR] Conectando RTDEReceive...")
+            self.rtde_r = rtde_receive.RTDEReceiveInterface(self.ROBOT_IP)
+            print("[UR] RTDE conectado.")
+        except Exception as e:
+            print("[UR] Error conectando RTDE:", e)
+            raise
 
-        target = np.array([x, y, z])
-        print(f"\n→ Moviendo hacia: {target}")
-        move_cartesian_smooth(target)
 
-    print("\n[UR] Socket cerrado.")
-    sock.close()
+    # ----------------------------------------------------------
+    # CONEXIÓN SOCKET PARA COMANDOS
+    # ----------------------------------------------------------
+    def connect_socket(self):
+        try:
+            print(f"[UR] Conectando Socket Script {self.ROBOT_IP}:{self.SOCKET_PORT}...")
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.ROBOT_IP, self.SOCKET_PORT))
+            print(f"[UR] Conectado a Robot(Socket) - Envio: {self.ROBOT_IP}:{self.SOCKET_PORT}")
+        except Exception as e:
+            print(f"[UR] Error conectando a UR(Socket) - Envio: {e}")
+            raise
+
+    # ----------------------------------------------------------
+    # CARGAR MODELO IKPY (URDF)
+    # ----------------------------------------------------------
+    def load_urdf(self):
+        print("[UR] Cargando UR3 URDF en IKPy...")
+
+        self.ur3_chain = Chain.from_urdf_file(
+            self.URDF_PATH,
+            active_links_mask=[False, False, True, True, True, True, True, True, False, False]
+        )
+        print(f"[IK] Cadena IKPy cargada. Total links: {len(self.ur3_chain.links)}")
+
+
+        # Descubrir índices de articulaciones reales del UR3
+        for idx, link in enumerate(self.ur3_chain.links):
+            if link.joint_type == "revolute":
+                self.joint_indices.append(idx)
+
+        print(f"[IK] Joints activos detectados: {self.joint_indices}")
+
+        self.joint_indices = [2, 3, 4, 5, 6, 7]  # articulaciones reales del UR3
+
+        print(f"[IK] Cadena IKPy cargada. DOF detectados: {len(self.joint_indices)}\n")
+
+        print("=== Links detectados ===")
+        for i, link in enumerate(self.ur3_chain.links):
+            print(f"{i}: name={link.name}, joint_type={link.joint_type}")
+        print("")
+
+
+    # ----------------------------------------------------------
+    # FUNCIÓN: obtener TCP real del UR3
+    # ----------------------------------------------------------
+    def get_tcp_real(self):
+        tcp = self.rtde_r.getActualTCPPose()
+        px, py, pz = tcp[0], tcp[1], tcp[2]
+        rx, ry, rz = tcp[3], tcp[4], tcp[5]
+        return np.array([px, py, pz]), np.array([rx, ry, rz])
+
+    # -----------------------------------------------------
+    # ESPERAR A QUE EL ROBOT SE DETENGA
+    # -----------------------------------------------------
+    def wait_robot_stopped(self,threshold=0.001):
+        while True:
+            speed = np.linalg.norm(self.rtde_r.getActualTCPSpeed()[0:3])
+            if speed < threshold:
+                break
+            time.sleep(0.02)
+
+    # -----------------------------------------------------
+    # LÍMITES DE SEGURIDAD (en radianes)
+    # -----------------------------------------------------
+    def clamp_joint_limits(self, q):
+        SAFE_LIMITS = [
+            (-2.8, 2.8),     # joint1
+            (-2.0, -0.1),    # joint2 (evita singularidad codo arriba)
+            (-2.8, 2.8),     # joint3
+            (-3.0, 3.0),     # joint4
+            (-2.0, 2.0),     # joint5
+            (-3.0, 3.0)      # joint6
+        ]
+
+        q_safe = []
+        for i, angle in enumerate(q):
+            low, high = SAFE_LIMITS[i]
+            q_safe.append(max(low, min(high, angle)))
+
+        return np.array(q_safe)
+
+
+    # -----------------------------------------------------
+    # POSICIÓN SEGURA DE ALINEACIÓN
+    # -----------------------------------------------------
+    def move_safe_align(self):
+        SAFE_ALIGN_Q = [
+            0.0,
+            -math.pi/2,
+            0.0,
+            -math.pi/2,
+            0.0,
+            0.0
+        ]
+        HOME_POINT_CMD = "movej([0, -1.57, 0, -1.57, 0, 0], a=1.0, v=0.5)\n"
+        print("\n[SAFE] Moviendo a ALIGN SAFE POSE...")
+        # cmd = (
+        #     f"movej([{','.join(map(str,SAFE_ALIGN_Q))}], a=0.5, v=0.2)\n"
+        # )
+        # self.socket.send(cmd.encode())
+        self.socket.send(HOME_POINT_CMD.encode())
+        self.wait_robot_stopped()
+        print("[SAFE] Robot en pose segura.\n")
+
+
+    # ----------------------------------------------------------
+    # FUNCIÓN: resolver IK y mover en trayectoria segura
+    # (NO la activamos todavía)
+    # MOVIMIENTO CARTESIANO SUAVE (trayectoria A → B)
+    # -----------------------------------------------------
+    def move_cartesian_smooth(self, target_xyz, steps=60):
+        """
+        Movimiento seguro:
+        ✔ Interpolación lineal
+        ✔ IKPy con orientación del TCP hacia abajo
+        ✔ Límites de seguridad
+        ✔ Envío suave moveJ
+        """
+
+        # Asegurar forma correcta (3,)
+        target_position = np.array(target_xyz, dtype=float).reshape(3,)
+
+        print("=== MOVIMIENTO SUAVE CON ORIENTACIÓN FIJA ===")
+
+        p_start, _ = self.get_tcp_real()
+        p_end = np.array(target_position)
+
+        print(f"Posición inicial (TCP): {p_start}")
+        print(f"Target deseado       : {p_end}")
+
+        # Orientación fija del TCP apuntando hacia abajo
+        R_fixed = R.from_euler("xyz", [math.pi, 0, 0]).as_matrix()
+
+        # Generar trayectoria interpolada
+        path = [
+            p_start + (p_end - p_start) * (i / steps)
+            for i in range(1, steps + 1)
+        ]
+
+        for i, p in enumerate(path):
+            print(f"[{i+1}/{steps}] Resolviendo IK hacia {p}")
+
+            # IK con orientación fija
+            sol = self.ur3_chain.inverse_kinematics(
+                target_position=p.tolist(),
+                target_orientation=R_fixed,
+                orientation_mode="all"
+            )
+
+            q = sol[self.joint_indices]  # convertir IKPy → UR3 real
+            print(f"q: {q}")
+            q = self.clamp_joint_limits(q)
+
+            # Enviar movimiento suave
+            cmd = f"movej([{','.join(map(str,q))}], a=0.5, v=0.6)\n"
+            self.socket.send(cmd.encode())
+
+            time.sleep(0.05)
+
+        self.wait_robot_stopped()
+
+        # Evaluación final del movimiento
+        tcp_final_pos, tcp_final_rot = self.get_tcp_real()
+        err = tcp_final_pos - p_end
+
+        print("\n===== FIN MOVIMIENTO SUAVE =====")
+        print("TCP REAL FINAL (pos):", tcp_final_pos)
+        print("TCP REAL FINAL (rot):", tcp_final_rot)
+        print("TARGET:", p_end)
+        print(f"ERROR FINAL: dx={err[0]:.4f}, dy={err[1]:.4f}, dz={err[2]:.4f}")
+        print("================================\n")
+
+    # ----------------------------------------------------------
+    # Cerrar conexiones
+    # ----------------------------------------------------------
+    def close(self):
+        print("[UR] Cerrando conexiones...")
+        if self.socket:
+            self.socket.close()
+        print("[UR] Conexiones cerradas.")
