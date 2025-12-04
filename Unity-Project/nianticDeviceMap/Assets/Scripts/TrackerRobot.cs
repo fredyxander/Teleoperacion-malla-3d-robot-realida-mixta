@@ -1,9 +1,10 @@
+using Niantic.Lightship.AR.Mapping;
+using Niantic.Lightship.AR.PersistentAnchors;
 using System;
 using System.Collections;
 using System.IO;
-using Niantic.Lightship.AR.Mapping;
-using Niantic.Lightship.AR.PersistentAnchors;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 using UnityEngine.XR.ARSubsystems;
 
@@ -28,11 +29,11 @@ public class TrackerRobot : MonoBehaviour
     public GameObject robotPreviewPrefab;
 
     [Header("Target Prefab")]
-    public GameObject targetSpherePrefab;   // ← NUEVO
+    public GameObject targetSpherePrefab;
 
     private GameObject robotInstance;
     private GameObject previewInstance;
-    private GameObject targetSphereInstance; // ← NUEVO
+    private GameObject targetSphereInstance;
 
     private RobotJointController joint;
     private ARPersistentAnchor anchor;
@@ -50,7 +51,6 @@ public class TrackerRobot : MonoBehaviour
     private Coroutine ikRoutine = null;
 
     private Transform effectorSphereTransform; // esfera azul TCP
-    public Transform targetSphereTransform => targetSphereInstance?.transform; // esfera verde (world)
 
     public RobotMode currentMode = RobotMode.None;
     public Action<bool> OnTrackingReady;
@@ -289,32 +289,37 @@ public class TrackerRobot : MonoBehaviour
         Vector3 p_world = targetSphereInstance.transform.position;
         Quaternion r = targetSphereInstance.transform.rotation;
 
-        // ---- 2) POSICIÓN DESDE LA BASE DEL ROBOT ----
+        // ---- 2) POSICIÓN LOCAL RELATIVA DESDE LA BASE DEL ROBOT ----
         Transform baseTf = joint.link1.parent;
-        Vector3 p_base = baseTf.InverseTransformPoint(p_world);
+        Vector3 p_local = baseTf.InverseTransformPoint(p_world);
 
         // ---- 3) CONVERSIÓN UNIDAD UNITY → UR ----
+        //Unity (z+=>atras, x+=>izquierda, y+=>arriba)
+        //UR3 (z+=>arriba, x+=>izquierda, y+=>atras)
         Vector3 p_ur;
-        p_ur.x = p_base.z;
-        p_ur.y = p_base.x;
-        p_ur.z = p_base.y;
+        p_ur.x = p_local.x;
+        p_ur.y = p_local.z;
+        p_ur.z = p_local.y;
 
         // LOGS PARA COMPARAR EN PYTHON
-        Debug.Log($"[UNITY] Target World = {p_world}");
-        Debug.Log($"[UNITY] Target Local (Base) = {p_base}");
-        Debug.Log($"[UNITY] Target Converted (UR frame) = {p_ur}");
+        Debug.Log($"[UNITY Target] Base world = {baseTf.position}");
+        Debug.Log($"[UNITY Target] Target World = {p_world}");
+        Debug.Log($"[UNITY Target] Target Local respecto a la (Base) = {p_local}");
+        Debug.Log($"[UNITY Target] Target Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
 
         // Mensaje simple en JSON
         // ---- 4) ENVIAR A PYTHON ----
-        IKRequestMsg msg = new IKRequestMsg();
-        msg.type = "ik_request";
-        msg.position = new float[] { p_ur.x, p_ur.y, p_ur.z };
-        msg.rotation = new float[] { 0, 0, 0, 1 };
+        IKRequestMsg msg = new IKRequestMsg
+        {
+            type = "ik_request",
+            position = new float[] { p_ur.x, p_ur.y, p_ur.z },
+            rotation = new float[] { 0, 0, 0, 1 }
+        };
         string json = JsonUtility.ToJson(msg);
 
         wsWorker.SendCommand(json);
 
-        Debug.Log($"[UNITY] JSON enviado a Python: {json}");
+        Debug.Log($"[UNITY] JSON TARGET enviado a Python: {json}");
     }
 
     [System.Serializable]
@@ -363,10 +368,8 @@ public class TrackerRobot : MonoBehaviour
         string json = JsonUtility.ToJson(msg);
         wsWorker.SendCommand(json);
 
-        Debug.Log("[UNITY] Envié base_pose → Python: " + json);
+        Debug.Log($"[UNITY] JSON base_pose a Python: {json}");
     }
-
-
 
     [System.Serializable]
     public class DigitalTCPReport
@@ -392,14 +395,17 @@ public class TrackerRobot : MonoBehaviour
         Vector3 p_local = baseTf.InverseTransformPoint(p_world);
 
         // 3. Convert local → UR frame (usa tu conversión actual)
+        //Unity (z+=>atras, x+=>izquierda, y+=>arriba)
+        //UR3 (z+=>arriba, x+=>izquierda, y+=>atras)
         Vector3 p_ur;
-        p_ur.x = p_local.z;
-        p_ur.y = -p_local.x;   // o sin el menos, según calibración
+        p_ur.x = p_local.x;
+        p_ur.y = p_local.z;
         p_ur.z = p_local.y;
 
-        // Debug.Log($"[UNITY TCP] Digital TCP world = {p_world}");
-        // Debug.Log($"[UNITY TCP] Digital TCP local = {p_local}");
-        // Debug.Log($"[UNITY TCP] Digital TCP URframe = {p_ur}");
+        Debug.Log($"[UNITY TCP] Base world = {baseTf.position}");
+        Debug.Log($"[UNITY TCP] Digital TCP world = {p_world}");
+        Debug.Log($"[UNITY TCP] Digital TCP local respecto a base = {p_local}");
+        Debug.Log($"[UNITY TCP] Digital TCP Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
 
         Quaternion q_world = effectorSphereTransform.rotation;
 
@@ -418,7 +424,7 @@ public class TrackerRobot : MonoBehaviour
         string json = JsonUtility.ToJson(msg);
         wsWorker.SendCommand(json);
 
-        Debug.Log("[UNITY] Envié digital_tcp → Python");
+        Debug.Log($"[UNITY] JSON digital_tcp a Python: {json}");
     }
     private void StopIKMove()
     {

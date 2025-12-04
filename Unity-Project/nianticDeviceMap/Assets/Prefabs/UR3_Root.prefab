@@ -25,14 +25,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1887534815620505793}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 5810541054567361553}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1835834026154453237
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -112,6 +112,10 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -367201645420907538, guid: 16a4b650524180e4784aa788e6a3c80f, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.0819
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 16a4b650524180e4784aa788e6a3c80f, type: 3}
       propertyPath: m_Name
       value: UR3_Robot_model
@@ -127,6 +131,10 @@ PrefabInstance:
     - target: {fileID: 3944704043600570418, guid: 16a4b650524180e4784aa788e6a3c80f, type: 3}
       propertyPath: m_IsActive
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4750789975766022807, guid: 16a4b650524180e4784aa788e6a3c80f, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.08534996
       objectReference: {fileID: 0}
     - target: {fileID: 6696608936547205550, guid: 16a4b650524180e4784aa788e6a3c80f, type: 3}
       propertyPath: m_IsActive

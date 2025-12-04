@@ -126,7 +126,7 @@ public class AnchorPlacementController : MonoBehaviour
     {
         if (!rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
         {
-            Debug.Log("[AnchorPlacement] No se detect? impacto al presionar B.");
+            Debug.Log("[AnchorPlacement] No se detectó impacto al presionar B.");
             return;
         }
 
@@ -136,14 +136,14 @@ public class AnchorPlacementController : MonoBehaviour
         // 1. POSICION
         pendingLocalPos = anchor.InverseTransformPoint(hit.point);
 
-        // 2. ROTACION ? SIEMPRE PARALELA AL PISO
+        // 2. ROTACION SIEMPRE PARALELA AL PISO
         Vector3 fwd = Camera.main.transform.forward;
 
         // Evitar casos donde forward es casi vertical
         if (Mathf.Abs(fwd.y) > 0.95f)
             fwd = Camera.main.transform.right; // fallback seguro
 
-        fwd.y = 0f;          // quitar inclinaci?n
+        fwd.y = 0f;          // quitar inclinación
         fwd.Normalize();
 
         Quaternion worldRot = Quaternion.LookRotation(fwd, Vector3.up);

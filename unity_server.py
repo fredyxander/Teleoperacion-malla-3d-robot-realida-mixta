@@ -26,7 +26,7 @@ calibration_ready = False
 
 
 # -------------------------------------------------------------
-# 🔵 CONVERSIÓN POSICIONES UNITY → UR3
+# 🔵 CONVERSIÓN POSICIONES TARGET UNITY → UR3 FRAME
 # -------------------------------------------------------------
 def unity_to_ur3(pos_u):
     global rot_offset, pos_offset, calibration_ready
@@ -35,13 +35,14 @@ def unity_to_ur3(pos_u):
         print("❌ ERROR: la calibración no está lista.")
         return None
 
-    pos_u = np.array(pos_u)
+    pos_u = np.array(pos_u, dtype=float)
 
-    # 1. Aplicar rotación de calibración
-    p_rot = rot_offset.apply(pos_u)
+    # # 1. Aplicar rotación de calibración
+    # p_rot = rot_offset.apply(pos_u)
 
     # 2. Aplicar offset de posición
-    p_corr  = p_rot + pos_offset
+    # Unity ya convierte → UR-frame → solo aplicar offset
+    p_corr  = pos_u + pos_offset
 
     return p_corr
 
@@ -66,7 +67,7 @@ def handle_base_pose(data):
 
 
 # -------------------------------------------------------------
-# PROCESAR DIGITAL TCP Y CALIBRAR
+# PROCESAR DIGITAL TCP Y CALIBRAR (Unity YA usa UR-frame)
 # -------------------------------------------------------------
 def handle_digital_tcp_and_calibrate(data):
     global unity_tcp_pos, unity_tcp_rot
@@ -83,23 +84,19 @@ def handle_digital_tcp_and_calibrate(data):
     real_pos, real_rot = ur3.get_tcp_real()
     log(f"REAL TCP (UR3) = {real_pos}")
 
-    # -----------------------------
-    # CALIBRACIÓN DE ROTACIÓN
-    # -----------------------------
-    unity_R = R.from_quat(unity_tcp_rot)
-    real_R = R.from_rotvec(real_rot)   # UR usa rotvec (Rx, Ry, Rz)
+    # --------------------------------------------
+    # CALIBRACIÓN: Solo traslación, sin rotación
+    # (Unity ya está enviando UR-frame)
+    # --------------------------------------------
+    # unity_R = R.from_quat(unity_tcp_rot)
+    # real_R = R.from_rotvec(real_rot)   # UR usa rotvec (Rx, Ry, Rz)
+    # rot_offset = real_R * unity_R.inv()
 
-    rot_offset = real_R * unity_R.inv()
-
-    # -----------------------------
-    # CALIBRACIÓN DE TRASLACIÓN
-    # -----------------------------
-    pos_offset = real_pos - rot_offset.apply(unity_tcp_pos)
+    pos_offset = real_pos - unity_tcp_pos
 
     calibration_ready = True
 
     log("======= CALIBRACIÓN COMPLETA =======")
-    log(f"rot_offset = {rot_offset.as_quat().tolist()}")
     log(f"pos_offset = {pos_offset}")
     log("=====================================")
 
@@ -122,6 +119,8 @@ async def handle_target(data):
     # 2) Convertir a coordenadas UR3
     # -----------------------------
     target_ur = unity_to_ur3(target_unity)
+    target_ur[0] = -target_ur[0]  # Invertir X para UR3
+    target_ur[1] = -target_ur[1]  # Invertir Y para UR3
     target_ur = np.array(target_ur, dtype=float).reshape(3,)
     print("➡ TARGET Convertido (UR3) =", target_ur)
 

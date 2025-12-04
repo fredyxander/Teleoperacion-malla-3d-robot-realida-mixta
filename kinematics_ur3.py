@@ -121,20 +121,8 @@ class UR3Controller:
     # POSICIÓN SEGURA DE ALINEACIÓN
     # -----------------------------------------------------
     def move_safe_align(self):
-        SAFE_ALIGN_Q = [
-            0.0,
-            -math.pi/2,
-            0.0,
-            -math.pi/2,
-            0.0,
-            0.0
-        ]
         HOME_POINT_CMD = "movej([0, -1.57, 0, -1.57, 0, 0], a=1.0, v=0.5)\n"
-        print("\n[SAFE] Moviendo a ALIGN SAFE POSE...")
-        # cmd = (
-        #     f"movej([{','.join(map(str,SAFE_ALIGN_Q))}], a=0.5, v=0.2)\n"
-        # )
-        # self.socket.send(cmd.encode())
+        print("\n[SAFE] Moviendo a Home POSE...")
         self.socket.send(HOME_POINT_CMD.encode())
         self.wait_robot_stopped()
         print("[SAFE] Robot en pose segura.\n")
