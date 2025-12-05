@@ -27,5 +27,9 @@ public class EffectorMarker : MonoBehaviour
         // Collider
         SphereCollider col = sphere.GetComponent<SphereCollider>();
         col.radius = 0.5f;
+
+        var tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
+        if (tracker != null)
+            tracker.RegisterEffectorSphere(sphere.transform);
     }
 }

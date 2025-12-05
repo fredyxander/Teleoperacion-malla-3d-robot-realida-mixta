@@ -102,7 +102,7 @@ def handle_digital_tcp_and_calibrate(data):
 
     return
 
-async def handle_target(data):
+async def handle_target(websocket, data):
     """Procesa un target enviado desde Unity, convierte al marco UR3 y ejecuta movimiento IK."""
 
     if not calibration_ready:
@@ -131,9 +131,17 @@ async def handle_target(data):
     ur3.move_cartesian_smooth(target_ur)
 
     # -----------------------------
-    # 4) Medir TCP final tras el movimiento
+    # 4) Leer estado real del robot
     # -----------------------------
-    tcp_real, _ = ur3.get_tcp_real()
+    tcp_real, tcp_rot = ur3.get_tcp_real()
+    joints_real = ur3.rtde_r.getActualQ()
+    joints_deg = np.degrees(joints_real).tolist()
+    # joints_real[0] = -joints_real[0]  # Invertir J1 para UR3
+    # joints_real[1] = -joints_real[1]   # Invertir J2 para UR3
+    # joints_real[2] = joints_real[2]
+    # joints_real[3] = joints_real[3] * 1.9  # Invertir J4 para UR3
+    # joints_real[4] = -joints_real[4] # Ajuste J5 para UR3
+    # joints_real[5] = -joints_real[5]    # Invertir J6 para UR3
     print("📍 TCP REAL después del movimiento =", tcp_real)
 
     # -----------------------------
@@ -142,7 +150,20 @@ async def handle_target(data):
     err = tcp_real - target_ur
     print("📏 Error final =", err)
 
-    # Enviar de vuelta a Unity
+    # -----------------------------
+    # 5) Enviar estado real a Unity
+    # -----------------------------
+    msg = {
+        "type": "robot_state",
+        "tcp_pos": tcp_real.tolist(),
+        "tcp_rotvec": tcp_rot.tolist(),
+        "joints": list(joints_real)
+    }
+
+    msg_json = json.dumps(msg)
+    await websocket.send(msg_json)
+    print("Joins en grados =", joints_deg)
+    print("📤 Estado real enviado a Unity:", msg_json)
 
     print("--------------------------------------------------\n")
 
@@ -161,7 +182,7 @@ async def process_message(websocket, data):
         return
 
     if msg_type == "ik_request":
-        await handle_target(data)
+        await handle_target(websocket, data)
         return
 
     log("⚠ Mensaje desconocido recibido.")

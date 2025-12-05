@@ -2,6 +2,7 @@ using NativeWebSocket;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -17,9 +18,20 @@ public class WebsocketWorker : MonoBehaviour
     [Header("UI Status")]
     public TextMeshProUGUI connectionStatusText;     // Texto estado de conexión del servidor
     public RobotCommands uiRobotManager;  // referencia al script RobotCommands
+    public RobotJointController robotJointController; //referencia al script RobotJoinController
 
     // Referencia opcional (si quieres arrastrarlo desde Unity)
     public TrackerRobot tracker;
+
+    [System.Serializable]
+    public class RobotStateMessage
+    {
+        public string type;
+        public float[] tcp_pos;
+        public float[] tcp_rotvec;
+        public float[] joints;
+    }
+
 
     // Actualiza la URL desde el InputField (SOLO INTERNO)
     private void UpdateURLFromInput()
@@ -229,25 +241,56 @@ public class WebsocketWorker : MonoBehaviour
         try
         {
             // Intentar parsear IK solution
-            IKSolution data = JsonUtility.FromJson<IKSolution>(msg);
-
-            if (data != null && data.type == "ik_solution")
+            RobotStateMessage data = JsonUtility.FromJson<RobotStateMessage>(msg);
+            if (data != null && data.type == "robot_state")
             {
-                Debug.Log("$[WS] Solución IK recibida {data}");
+                Debug.Log($"Solucion IK recibida {data}");
 
-                if (data.type == "robot_tcp")
+                if (data.type == "robot_state")
                 {
                     Debug.Log($"[UNITY] TCP real: ({data.tcp_pos[0]}, {data.tcp_pos[1]}, {data.tcp_pos[2]})");
+                    Debug.Log($"[UNITY] data.joints: ({data.joints[0]}, {data.joints[1]}, {data.joints[2]}, {data.joints[3]}, {data.joints[4]}, {data.joints[5]})");
                 }
 
                 if (tracker == null)
                     tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
 
-                if (tracker != null)
-                    tracker.OnIkSolutionReceived(data.q);
+                // Aplicar Joints
+                if (robotJointController == null)
+                    robotJointController = UnityEngine.Object.FindFirstObjectByType<RobotJointController>();
+
+                //Mover juntas del robot (gemelo digital)
+                Debug.Log($"robotJointController: {robotJointController}");
+                robotJointController.ApplyJointAngles(data.joints);
+
+                // Actualizar esfera del TCP
+                tracker.UpdateEffectorSphereFromUR(data.tcp_pos);
+
+                Debug.Log("[UNITY] Robot actualizado desde Python.");
 
                 return;
             }
+
+            //// Intentar parsear IK solution
+            //IKSolution data = JsonUtility.FromJson<IKSolution>(msg);
+
+            //if (data != null && data.type == "ik_solution")
+            //{
+            //    Debug.Log("$[WS] Solución IK recibida {data}");
+
+            //    if (data.type == "robot_tcp")
+            //    {
+            //        Debug.Log($"[UNITY] TCP real: ({data.tcp_pos[0]}, {data.tcp_pos[1]}, {data.tcp_pos[2]})");
+            //    }
+
+            //    if (tracker == null)
+            //        tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
+
+            //    if (tracker != null)
+            //        tracker.OnIkSolutionReceived(data.q);
+
+            //    return;
+            //}
         }
         catch (Exception ex)
         {

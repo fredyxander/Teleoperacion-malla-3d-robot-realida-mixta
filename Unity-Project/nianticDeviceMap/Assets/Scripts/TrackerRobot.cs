@@ -274,6 +274,37 @@ public class TrackerRobot : MonoBehaviour
         }
     }
 
+    // ACTUALIZAR POSICIÓN REAL DEL TCP RECIBIDO DESDE PYTHON
+    public void UpdateEffectorSphereFromUR(float[] tcp_ur)
+    {
+        if (joint == null || effectorSphereTransform == null)
+        {
+            Debug.LogWarning("[TrackerRobot] Falta effectorSphere o joints.");
+            return;
+        }
+
+        Transform baseTf = joint.link1.parent;
+
+        Vector3 p_local;
+
+        // Conversión inversa UR → Unity
+        // Unity (x izquierda, y arriba, z atrás)
+        // UR3   (x izquierda, z arriba, y atrás)
+        p_local.x = tcp_ur[0];
+        p_local.y = tcp_ur[2];
+        p_local.z = tcp_ur[1];
+
+        Vector3 p_world = baseTf.TransformPoint(p_local);
+
+        effectorSphereTransform.position = p_world;
+    }
+
+    // Este método se llama desde EffectorMarker.cs detectando la esfera azul
+    public void RegisterEffectorSphere(Transform tf)
+    {
+        effectorSphereTransform = tf;
+    }
+
     // =======================================================================
     // IK MOVE
     // =======================================================================
