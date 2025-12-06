@@ -242,22 +242,30 @@ public class WebsocketWorker : MonoBehaviour
         {
             // Intentar parsear IK solution
             RobotStateMessage data = JsonUtility.FromJson<RobotStateMessage>(msg);
-            if (data != null && data.type == "robot_state")
+            if (data != null)
             {
-                Debug.Log($"Solucion IK recibida {data}");
-
-                if (data.type == "robot_state")
-                {
-                    Debug.Log($"[UNITY] TCP real: ({data.tcp_pos[0]}, {data.tcp_pos[1]}, {data.tcp_pos[2]})");
-                    Debug.Log($"[UNITY] data.joints: ({data.joints[0]}, {data.joints[1]}, {data.joints[2]}, {data.joints[3]}, {data.joints[4]}, {data.joints[5]})");
-                }
-
                 if (tracker == null)
                     tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
 
                 // Aplicar Joints
                 if (robotJointController == null)
                     robotJointController = UnityEngine.Object.FindFirstObjectByType<RobotJointController>();
+
+                if (data.type == "joint_fixed_pose")
+                {
+                    float[] q = data.joints;
+                    Debug.Log($"[UNITY] Joint state recibido desde Python {q}");
+
+                    robotJointController.ApplyJointAngles(q);
+                    return;
+                }
+
+                Debug.Log($"Solucion IK recibida {data}");
+                if (data.type == "robot_state")
+                {
+                    Debug.Log($"[UNITY] TCP real: ({data.tcp_pos[0]}, {data.tcp_pos[1]}, {data.tcp_pos[2]})");
+                    Debug.Log($"[UNITY] data.joints: ({data.joints[0]}, {data.joints[1]}, {data.joints[2]}, {data.joints[3]}, {data.joints[4]}, {data.joints[5]})");
+                }
 
                 //Mover juntas del robot (gemelo digital)
                 Debug.Log($"robotJointController: {robotJointController}");

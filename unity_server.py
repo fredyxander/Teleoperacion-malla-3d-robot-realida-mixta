@@ -119,8 +119,8 @@ async def handle_target(websocket, data):
     # 2) Convertir a coordenadas UR3
     # -----------------------------
     target_ur = unity_to_ur3(target_unity)
-    target_ur[0] = -target_ur[0]  # Invertir X para UR3
-    target_ur[1] = -target_ur[1]  # Invertir Y para UR3
+    # target_ur[0] = -target_ur[0]  # Invertir X para UR3
+    # target_ur[1] = -target_ur[1]  # Invertir Y para UR3
     target_ur = np.array(target_ur, dtype=float).reshape(3,)
     print("➡ TARGET Convertido (UR3) =", target_ur)
 

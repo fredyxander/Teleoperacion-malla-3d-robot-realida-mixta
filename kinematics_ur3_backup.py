@@ -16,7 +16,7 @@ SOCKET_PORT = 30002
 # -----------------------------------------------------
 # CARGAR CADENA IKPY (URDF)
 # -----------------------------------------------------
-URDF_PATH = "robot_models/ur3.urdf"
+URDF_PATH = "robot_models/ur3_no_gripper.urdf"
 # Cargar URDF con versión de IKPy que no soporta argumentos extra
 ur3_chain = Chain.from_urdf_file(URDF_PATH)
 

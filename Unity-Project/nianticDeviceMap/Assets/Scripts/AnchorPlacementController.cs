@@ -146,7 +146,15 @@ public class AnchorPlacementController : MonoBehaviour
         fwd.y = 0f;          // quitar inclinación
         fwd.Normalize();
 
-        Quaternion worldRot = Quaternion.LookRotation(fwd, Vector3.up);
+        Quaternion yawOnly = Quaternion.LookRotation(fwd, Vector3.up);
+
+        // 2) Esta es la rotación necesaria para dejar al robot de pie
+        Quaternion upright = Quaternion.Euler(-90, 0, 0);
+
+        // 3) Combinamos: primero upright, luego yaw
+        Quaternion worldRot = yawOnly * upright;
+
+        // Transformar a espacio local del anchor
         pendingLocalRot = Quaternion.Inverse(anchor.rotation) * worldRot;
 
         // 3. ACTIVAR PREVIEW

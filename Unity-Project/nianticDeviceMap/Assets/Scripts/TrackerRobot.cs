@@ -198,6 +198,9 @@ public class TrackerRobot : MonoBehaviour
             joint.AutoDetectJoints(robotInstance.transform);
         }
 
+        // ⬇⬇⬇ FIX PARA ORIENTAR Z-UP (URDF) → Y-UP (UNITY)
+        Quaternion urdfToUnity = Quaternion.Euler(90f, 90f, 0f);
+
         if (AnchorPoseStorage.TryLoadLocalPose(out var localPos, out var localRot))
         {
             robotInstance.transform.localPosition = localPos;
@@ -206,7 +209,7 @@ public class TrackerRobot : MonoBehaviour
         else
         {
             robotInstance.transform.localPosition = Vector3.zero;
-            robotInstance.transform.localRotation = Quaternion.identity;
+            robotInstance.transform.localRotation = urdfToUnity;
         }
     }
 
@@ -215,12 +218,13 @@ public class TrackerRobot : MonoBehaviour
     // =======================================================================
     private void AddEffectorMarker()
     {
+        Debug.Log($"existe {joint.endEffector}");
         if (joint == null || joint.endEffector == null)
             return;
 
         if (joint.endEffector.GetComponentInChildren<EffectorMarker>() != null)
             return;
-
+        Debug.Log("agregando efector sphere a endEffector joint");
         EffectorMarker marker = joint.endEffector.gameObject.AddComponent<EffectorMarker>();
         marker.effectorMaterial = effectorMaterial;
     }
@@ -290,8 +294,14 @@ public class TrackerRobot : MonoBehaviour
         // Conversión inversa UR → Unity
         // Unity (x izquierda, y arriba, z atrás)
         // UR3   (x izquierda, z arriba, y atrás)
-        p_local.x = tcp_ur[0];
-        p_local.y = tcp_ur[2];
+        //p_local.x = tcp_ur[0];
+        //p_local.y = tcp_ur[2];
+        //p_local.z = tcp_ur[1];
+
+
+        // Convert Unity → URDF frame local (REP-103)
+        p_local.x = tcp_ur[2];
+        p_local.y = tcp_ur[0];
         p_local.z = tcp_ur[1];
 
         Vector3 p_world = baseTf.TransformPoint(p_local);
@@ -327,23 +337,30 @@ public class TrackerRobot : MonoBehaviour
         // ---- 3) CONVERSIÓN UNIDAD UNITY → UR ----
         //Unity (z+=>atras, x+=>izquierda, y+=>arriba)
         //UR3 (z+=>arriba, x+=>izquierda, y+=>atras)
-        Vector3 p_ur;
-        p_ur.x = p_local.x;
-        p_ur.y = p_local.z;
-        p_ur.z = p_local.y;
+        //Vector3 p_ur = p_local;
+        //p_ur.x = p_local.x;
+        //p_ur.y = p_local.z;
+        //p_ur.z = p_local.y;
+
+        // Convert Unity local → URDF frame (REP-103)
+        Vector3 p_urdf;
+        p_urdf.x = p_local.z;     // adelante
+        p_urdf.y = p_local.x;     // izquierda
+        p_urdf.z = p_local.y;     // arriba
 
         // LOGS PARA COMPARAR EN PYTHON
         Debug.Log($"[UNITY Target] Base world = {baseTf.position}");
         Debug.Log($"[UNITY Target] Target World = {p_world}");
         Debug.Log($"[UNITY Target] Target Local respecto a la (Base) = {p_local}");
-        Debug.Log($"[UNITY Target] Target Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
+        //Debug.Log($"[UNITY Target] Target Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
+        Debug.Log($"[UNITY Target] Target Converted (UR frame) = ({p_urdf.x:F6}, {p_urdf.y:F6}, {p_urdf.z:F6})");
 
         // Mensaje simple en JSON
         // ---- 4) ENVIAR A PYTHON ----
         IKRequestMsg msg = new IKRequestMsg
         {
             type = "ik_request",
-            position = new float[] { p_ur.x, p_ur.y, p_ur.z },
+            position = new float[] { p_urdf.x, p_urdf.y, p_urdf.z },
             rotation = new float[] { 0, 0, 0, 1 }
         };
         string json = JsonUtility.ToJson(msg);
@@ -367,6 +384,11 @@ public class TrackerRobot : MonoBehaviour
     {
         if (joint != null && q != null && q.Length == 6)
             joint.ApplyJointAngles(q);
+    }
+
+    public void OnTestJointsButton()
+    {
+        StartCoroutine(joint.TestJointsRoutine());
     }
 
     [System.Serializable]
@@ -428,15 +450,23 @@ public class TrackerRobot : MonoBehaviour
         // 3. Convert local → UR frame (usa tu conversión actual)
         //Unity (z+=>atras, x+=>izquierda, y+=>arriba)
         //UR3 (z+=>arriba, x+=>izquierda, y+=>atras)
-        Vector3 p_ur;
-        p_ur.x = p_local.x;
-        p_ur.y = p_local.z;
-        p_ur.z = p_local.y;
+        //Vector3 p_ur;
+        //p_ur.x = p_local.x;
+        //p_ur.y = p_local.z;
+        //p_ur.z = p_local.y;
+
+        // Convert Unity local → URDF frame (REP-103)
+        Vector3 p_urdf;
+        p_urdf.x = p_local.z;     // adelante
+        p_urdf.y = p_local.x;     // izquierda
+        p_urdf.z = p_local.y;     // arriba
+
 
         Debug.Log($"[UNITY TCP] Base world = {baseTf.position}");
         Debug.Log($"[UNITY TCP] Digital TCP world = {p_world}");
         Debug.Log($"[UNITY TCP] Digital TCP local respecto a base = {p_local}");
-        Debug.Log($"[UNITY TCP] Digital TCP Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
+        //Debug.Log($"[UNITY TCP] Digital TCP Converted (UR frame) = ({p_ur.x:F6}, {p_ur.y:F6}, {p_ur.z:F6})");
+        Debug.Log($"[UNITY TCP] Digital TCP Converted (UR frame) = ({p_urdf.x:F6}, {p_urdf.y:F6}, {p_urdf.z:F6})");
 
         Quaternion q_world = effectorSphereTransform.rotation;
 
@@ -448,7 +478,7 @@ public class TrackerRobot : MonoBehaviour
 
         DigitalTCPReport msg = new DigitalTCPReport {
             type = "digital_tcp",
-            position = new float[]{ p_ur.x, p_ur.y, p_ur.z },
+            position = new float[]{ p_urdf.x, p_urdf.y, p_urdf.z },
             rotation = new float[]{ q_ur.x, q_ur.y, q_ur.z, q_ur.w }
         };
 

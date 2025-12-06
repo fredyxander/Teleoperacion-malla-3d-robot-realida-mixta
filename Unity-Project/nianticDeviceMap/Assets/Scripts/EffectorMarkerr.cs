@@ -14,8 +14,8 @@ public class EffectorMarker : MonoBehaviour
         sphere.transform.SetParent(transform, false);
 
         // Posición y tamaño
-        sphere.transform.localPosition = new Vector3(0f, 0f, 0f);
-        sphere.transform.localScale = Vector3.one * 0.05f;
+        sphere.transform.localPosition = new Vector3(0f, 0.08f, 0f);
+        sphere.transform.localScale = Vector3.one * 0.04f;
 
         // Asignar material EXACTO como lo hicimos con TargetSphere
         var renderer = sphere.GetComponent<Renderer>();

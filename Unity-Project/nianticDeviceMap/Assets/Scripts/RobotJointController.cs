@@ -18,25 +18,27 @@ public class RobotJointController : MonoBehaviour
     // ============================================================
     public void AutoDetectJoints(Transform robotRoot)
     {
-        Transform baseNode = robotRoot.Find("UR3_Robot_model/Base");
+        //Transform baseNode = robotRoot.Find("UR3_Robot_model/Base");
+        Transform baseNode = robotRoot.Find("base_link");
 
-        link1 = baseNode.Find("Link1");
-        link2 = link1.Find("Link2");
-        link3 = link2.Find("Link3");
-        link4 = link3.Find("Link4");
-        link5 = link4.Find("Link5");
-        link6 = link5.Find("Link6");
+        link1 = baseNode.Find("shoulder_link");
+        link2 = link1.Find("upper_arm_link");
+        link3 = link2.Find("forearm_link");
+        link4 = link3.Find("wrist_1_link");
+        link5 = link4.Find("wrist_2_link");
+        link6 = link5.Find("wrist_3_link");
         if (endEffector == null)
             endEffector = link6;
 
         Debug.Log("UR3 joints autodetect OK.");
+        Debug.Log($"joints: {link1} {link2} {link3} {link4} {link5} {link6} {endEffector}");
         //UpdateCurrentFromTransforms();
     }
 
     // ============================================================
     // APLICAR ÁNGULOS A LOS JOINTS (MODO JOINT SPACE)
     // ============================================================
-    public void ApplyJointAngles(float[] q)
+    public void ApplyJointAngles(float[] q) //q en radianes
     {
         if (q == null || q.Length < 6)
         {
@@ -51,29 +53,66 @@ public class RobotJointController : MonoBehaviour
         Debug.Log($"ApplyJointAngles: q{q} current: {current}");
         Debug.Log($"joints: {link1} {link2} {link3} {link4} {link5} {link6}");
 
-        //if (link1) link1.localRotation = Quaternion.Euler(0, q[0], 0); // Joint1 → eje Y
-        //link1.localRotation = Quaternion.Euler(0, q[0], 0); // Joint1 → eje Y
+        //joint_fixed_pose
+        //Conversion a grados - calibracion sentido ejes
+        float q0 = -q[0] * Mathf.Rad2Deg;
+        float q1 = (q[1] + 1.57f) * Mathf.Rad2Deg;
+        float q2 = q[2] * Mathf.Rad2Deg;
+        float q3 = (q[3] + 1.57f) * Mathf.Rad2Deg;
+        float q4 = q[4] * Mathf.Rad2Deg;
+        float q5 = q[5] * Mathf.Rad2Deg;
+        Debug.Log($"grados: {q0}, {q1}, {q2}, {q3}, {q4}, {q5}");
 
-        //if (link2) link2.localRotation = Quaternion.Euler(0, 0, q[1]); // Joint2 → eje Z
-        //if (link3) link3.localRotation = Quaternion.Euler(0, 0, q[2]); // Joint3 → eje Z
-        //if (link4) link4.localRotation = Quaternion.Euler(0, 0, q[3]); // Joint4 → eje Z
-        //if (link5) link5.localRotation = Quaternion.Euler(0, q[4], 0); // Joint5 → eje Y
-        //if (link6) link6.localRotation = Quaternion.Euler(0, 0, q[5]); // Joint6 → eje Z
-
-        //link1.localRotation = Quaternion.Euler(0, q[0] * Mathf.Rad2Deg, 0); // Joint1 → eje Y
-        //link2.localRotation = Quaternion.Euler(0,0,q[1] * Mathf.Rad2Deg);
-        //link3.localRotation = Quaternion.Euler(0,0,q[2] * Mathf.Rad2Deg);
-        //link4.localRotation = Quaternion.Euler(0,0,q[3] * Mathf.Rad2Deg);
-        //link5.localRotation = Quaternion.Euler(0,q[4] * Mathf.Rad2Deg, 0);
-        //link6.localRotation = Quaternion.Euler(0, 0, q[5] * Mathf.Rad2Deg);
-
-        link1.localEulerAngles =  new Vector3(0, -q[0] * Mathf.Rad2Deg, 0); // Joint1 → eje Y
-        link2.localEulerAngles = new Vector3(0, 0, -q[1] * Mathf.Rad2Deg);
-        link3.localEulerAngles = new Vector3(0, 0, -q[2] * Mathf.Rad2Deg);
-        link4.localEulerAngles = new Vector3(q[3] * Mathf.Rad2Deg, 0 ,0);
-        link5.localEulerAngles = new Vector3(0, q[4] * Mathf.Rad2Deg, 0);
-        link6.localEulerAngles = new Vector3(q[5] * Mathf.Rad2Deg,0,0);
+        link1.localRotation = Quaternion.Euler(0, 0, q0);  // Joint1 → eje Z
+        link2.localRotation = Quaternion.Euler(0, q1, 0);  // Joint2 → eje Y
+        link3.localRotation = Quaternion.Euler(0, q2, 0);  // Joint3 → eje Y
+        link4.localRotation = Quaternion.Euler(0, q3, 0);  // Joint4 → eje Y
+        link5.localRotation = Quaternion.Euler(0, 0, q4);  // Joint5 → eje Z
+        link6.localRotation = Quaternion.Euler(0, q5, 0);  // Joint6 → eje Y
     }
+
+    // PRUEBA DE MOVIMIENTO DE EJES UR DIGITAL
+    public void SetJoint(int index, float angleDeg)
+    {
+        float angleRad = angleDeg * Mathf.Deg2Rad;
+        Debug.Log($"angleRad {angleRad}");
+
+        switch (index)
+        {
+            case 0: link1.localRotation = Quaternion.Euler(0, 0, angleDeg); break;  // Joint1 → z
+            case 1: link2.localRotation = Quaternion.Euler(0, angleDeg, 0); break;  // Joint2 → y
+            case 2: link3.localRotation = Quaternion.Euler(0, angleDeg, 0); break;  // Joint3 → y
+            case 3: link4.localRotation = Quaternion.Euler( 0, angleDeg, 0); break;  // Joint4 → y
+            case 4: link5.localRotation = Quaternion.Euler(0, 0, angleDeg); break;  // Joint5 → z
+            case 5: link6.localRotation = Quaternion.Euler(0, angleDeg, 0); break;  // Joint6 → y
+        }
+    }
+
+    public IEnumerator TestJointsRoutine()
+    {
+        float testAngle = 30f;
+
+        for (int j = 0; j < 6; j++)
+        {
+            Debug.Log($"=== Probando Joint {j + 1} ===");
+
+            // +30°
+            SetJoint(j, testAngle);
+            yield return new WaitForSeconds(2f);
+
+            // -30°
+            SetJoint(j, -testAngle);
+            yield return new WaitForSeconds(2f);
+
+            // Regresar
+            SetJoint(j, 0f);
+            yield return new WaitForSeconds(2f);
+        }
+
+        Debug.Log("===== FIN TEST JOINTS UNITY =====");
+    }
+
+
 
     public float[] GetCurrentAngles() => current;
 

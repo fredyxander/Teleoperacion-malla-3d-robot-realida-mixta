@@ -13,7 +13,7 @@ class UR3Controller:
         self.socket = None
         self.RTDE_PORT = 30004
         self.SOCKET_PORT = 30002
-        self.URDF_PATH = "robot_models/ur3.urdf"
+        self.URDF_PATH = "robot_models/ur3_no_gripper.urdf"
         self.joint_indices = []
 
         print("[UR] Inicializando UR3Controller...")
@@ -55,7 +55,7 @@ class UR3Controller:
 
         self.ur3_chain = Chain.from_urdf_file(
             self.URDF_PATH,
-            active_links_mask=[False, False, True, True, True, True, True, True, False, False]
+            active_links_mask= [False, True, True, True, True, True, True, False]
         )
         print(f"[IK] Cadena IKPy cargada. Total links: {len(self.ur3_chain.links)}")
 
@@ -67,7 +67,7 @@ class UR3Controller:
 
         print(f"[IK] Joints activos detectados: {self.joint_indices}")
 
-        self.joint_indices = [2, 3, 4, 5, 6, 7]  # articulaciones reales del UR3
+        self.joint_indices = [1, 2, 3, 4, 5, 6]  # articulaciones reales del UR3
 
         print(f"[IK] Cadena IKPy cargada. DOF detectados: {len(self.joint_indices)}\n")
 
