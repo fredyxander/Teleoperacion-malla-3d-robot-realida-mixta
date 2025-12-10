@@ -46,10 +46,6 @@ public class RobotJointController : MonoBehaviour
             return;
         }
 
-        // Guardar estado actual
-        for (int i = 0; i < 6; i++)
-            current[i] = q[i];
-
         Debug.Log($"ApplyJointAngles: q{q} current: {current}");
         Debug.Log($"joints: {link1} {link2} {link3} {link4} {link5} {link6}");
 
@@ -112,9 +108,6 @@ public class RobotJointController : MonoBehaviour
         Debug.Log("===== FIN TEST JOINTS UNITY =====");
     }
 
-
-
-    public float[] GetCurrentAngles() => current;
 
     //private void UpdateCurrentFromTransforms()
     //{

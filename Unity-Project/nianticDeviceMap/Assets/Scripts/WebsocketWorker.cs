@@ -119,12 +119,11 @@ public class WebsocketWorker : MonoBehaviour
             var tracker = UnityEngine.Object.FindFirstObjectByType<TrackerRobot>();
             if (tracker != null)
             {
-                tracker.SendRobotBasePoseToPython();      // 1) base pose
-                tracker.SendCurrentDigitalTCPToPython();  // 2) digital tcp
+                tracker.SendCurrentDigitalTCPToPython();  // digital tcp
             }
             else
             {
-                Debug.LogWarning("[WS] No encontré TrackerRobot para enviar TCP/base pose.");
+                Debug.LogWarning("[WS] No encontró TrackerRobot para enviar TCP pose.");
             }
         };
 
@@ -133,7 +132,7 @@ public class WebsocketWorker : MonoBehaviour
             if (cancelConnection) return;
 
             string msg = System.Text.Encoding.UTF8.GetString(bytes);
-            Debug.Log("Mensaje recibido desde server py: " + msg);
+            Debug.Log("p: " + msg);
 
             HandleIncomingMessage(msg);
         };
@@ -232,12 +231,6 @@ public class WebsocketWorker : MonoBehaviour
     // =====================================================
     private void HandleIncomingMessage(string msg)
     {
-        if (msg == "home_reached")
-        {
-            uiRobotManager.UpdateJointStatus("Robot in Home", Color.green);
-            return;
-        }
-
         try
         {
             // Intentar parsear IK solution
@@ -251,12 +244,19 @@ public class WebsocketWorker : MonoBehaviour
                 if (robotJointController == null)
                     robotJointController = UnityEngine.Object.FindFirstObjectByType<RobotJointController>();
 
-                if (data.type == "joint_fixed_pose")
+                if (data.type == "joints_ur3_feedback")
                 {
                     float[] q = data.joints;
                     Debug.Log($"[UNITY] Joint state recibido desde Python {q}");
 
                     robotJointController.ApplyJointAngles(q);
+                    return;
+                }
+
+                if (data.type == "home_reached")
+                {
+                    uiRobotManager.UpdateJointStatus("Robot in Home", Color.green);
+                    Debug.Log($"[UNITY] home_reached recibido desde Python");
                     return;
                 }
 

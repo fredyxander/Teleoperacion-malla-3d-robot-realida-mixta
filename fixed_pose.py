@@ -68,7 +68,7 @@ def get_tcp_q():
     return joints
 
 # -------------------------------------------------------------
-# HANDLER DE CLIENTE UNITY
+# HANDLER DE CLIENTE UNITY fixed pose
 # -------------------------------------------------------------
 async def client_handler(websocket, path=None):
     log("Unity conectado.")
@@ -160,5 +160,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-

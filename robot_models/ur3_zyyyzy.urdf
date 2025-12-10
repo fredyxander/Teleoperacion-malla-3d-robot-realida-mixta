@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="u3_zyyyzy">
+
+  <!-- =========================
+       LINK BASE
+  ========================== -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <!-- Usa tus meshes reales o deja un cubo placeholder -->
+        <mesh filename="package://ur_description/meshes/ur3/visual/base.dae"/>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/base.stl"/>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J1 – shoulder_pan_joint
+       EJE: Z
+       DESDE base_link A shoulder_link
+  ========================== -->
+  <joint name="shoulder_pan_joint" type="revolute">
+    <parent link="base_link"/>
+    <child  link="shoulder_link"/>
+    <!-- offset: columna vertical de la base al hombro -->
+    <origin xyz="0 0 0.1519" rpy="0 0 0"/>
+    <!-- EJE Z -->
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="330" velocity="2.16"/>
+  </joint>
+
+  <link name="shoulder_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/shoulder.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/shoulder.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J2 – shoulder_lift_joint
+       EJE: Y
+       DESDE shoulder_link A upper_arm_link
+  ========================== -->
+  <joint name="shoulder_lift_joint" type="revolute">
+    <parent link="shoulder_link"/>
+    <child  link="upper_arm_link"/>
+    <!-- brazo sale "hacia delante" (eje Y ROS, tú ya lo tienes controlado en Unity) -->
+    <origin xyz="0 0.1198 0" rpy="0 0 0"/>
+    <!-- EJE Y -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="330" velocity="2.16"/>
+  </joint>
+
+  <link name="upper_arm_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/upperarm.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/upperarm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J3 – elbow_joint
+       EJE: Y
+       DESDE upper_arm_link A forearm_link
+  ========================== -->
+  <joint name="elbow_joint" type="revolute">
+    <parent link="upper_arm_link"/>
+    <child  link="forearm_link"/>
+    <!-- offset medido desde la doc oficial UR -->
+    <origin xyz="0 -0.0925 0.24365" rpy="0 0 0"/>
+    <!-- EJE Y -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="150" velocity="3.15"/>
+  </joint>
+
+  <link name="forearm_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/forearm.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/forearm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J4 – wrist_1_joint
+       EJE: Y
+       DESDE forearm_link A wrist_1_link
+  ========================== -->
+  <joint name="wrist_1_joint" type="revolute">
+    <parent link="forearm_link"/>
+    <child  link="wrist_1_link"/>
+    <origin xyz="0 0 0.21325" rpy="0 0 0"/>
+    <!-- EJE Y -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="54" velocity="3.2"/>
+  </joint>
+
+  <link name="wrist_1_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/wrist1.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/wrist1.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J5 – wrist_2_joint
+       EJE: Z
+       DESDE wrist_1_link A wrist_2_link
+  ========================== -->
+  <joint name="wrist_2_joint" type="revolute">
+    <parent link="wrist_1_link"/>
+    <child  link="wrist_2_link"/>
+    <origin xyz="0 0.08505 0" rpy="0 0 0"/>
+    <!-- EJE Z -->
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="54" velocity="3.2"/>
+  </joint>
+
+  <link name="wrist_2_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/wrist2.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/wrist2.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       J6 – wrist_3_joint
+       EJE: Y
+       DESDE wrist_2_link A wrist_3_link
+  ========================== -->
+  <joint name="wrist_3_joint" type="revolute">
+    <parent link="wrist_2_link"/>
+    <child  link="wrist_3_link"/>
+    <origin xyz="0 0 0.08535" rpy="0 0 0"/>
+    <!-- EJE Y -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="54" velocity="3.2"/>
+  </joint>
+
+  <link name="wrist_3_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/visual/wrist3.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://ur_description/meshes/ur3/collision/wrist3.stl"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- =========================
+       TOOL0 (TCP UR3)
+  ========================== -->
+  <joint name="wrist_3_link-tool0_fixed_joint" type="fixed">
+    <parent link="wrist_3_link"/>
+    <child  link="tool0"/>
+    <!-- aquí puedes añadir el offset del TCP si lo necesitas -->
+    <origin xyz="0 0 0.0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="tool0"/>
+
+</robot>

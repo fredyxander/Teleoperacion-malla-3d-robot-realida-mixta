@@ -343,10 +343,10 @@ public class TrackerRobot : MonoBehaviour
         //p_ur.z = p_local.y;
 
         // Convert Unity local → URDF frame (REP-103)
-        Vector3 p_urdf;
-        p_urdf.x = p_local.z;     // adelante
-        p_urdf.y = p_local.x;     // izquierda
-        p_urdf.z = p_local.y;     // arriba
+        Vector3 p_urdf = p_local;
+        //p_urdf.x = p_local.z;     // adelante
+        //p_urdf.y = p_local.x;     // izquierda
+        //p_urdf.z = p_local.y;     // arriba
 
         // LOGS PARA COMPARAR EN PYTHON
         Debug.Log($"[UNITY Target] Base world = {baseTf.position}");
@@ -392,39 +392,6 @@ public class TrackerRobot : MonoBehaviour
     }
 
     [System.Serializable]
-    public class BasePoseReport
-    {
-        public string type = "base_pose";
-        public float[] position;
-        public float[] rotation;
-    }
-
-    public void SendRobotBasePoseToPython()
-    {
-        if (joint == null)
-        {
-            Debug.LogWarning("[TrackerRobot] No hay joint controller.");
-            return;
-        }
-
-        Transform baseTf = joint.link1.parent;
-
-        Vector3 p_world = baseTf.position;
-        Quaternion q_world = baseTf.rotation;
-
-        BasePoseReport msg = new BasePoseReport
-        {
-            position = new float[] { p_world.x, p_world.y, p_world.z },
-            rotation = new float[] { q_world.x, q_world.y, q_world.z, q_world.w }
-        };
-
-        string json = JsonUtility.ToJson(msg);
-        wsWorker.SendCommand(json);
-
-        Debug.Log($"[UNITY] JSON base_pose a Python: {json}");
-    }
-
-    [System.Serializable]
     public class DigitalTCPReport
     {
         public string type;
@@ -456,10 +423,10 @@ public class TrackerRobot : MonoBehaviour
         //p_ur.z = p_local.y;
 
         // Convert Unity local → URDF frame (REP-103)
-        Vector3 p_urdf;
-        p_urdf.x = p_local.z;     // adelante
-        p_urdf.y = p_local.x;     // izquierda
-        p_urdf.z = p_local.y;     // arriba
+        Vector3 p_urdf=p_local;
+        //p_urdf.x = p_local.z;     // adelante
+        //p_urdf.y = p_local.x;     // izquierda
+        //p_urdf.z = p_local.y;     // arriba
 
 
         Debug.Log($"[UNITY TCP] Base world = {baseTf.position}");

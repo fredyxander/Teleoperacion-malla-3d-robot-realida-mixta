@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using static TrackerRobot;
 
 //public class RobotCommands : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 public class RobotCommands : MonoBehaviour
@@ -74,10 +75,23 @@ public class RobotCommands : MonoBehaviour
         UpdateJointStatus("muneca3 join", Color.white);
     }
 
+    [System.Serializable]
+    public class ServerMsg
+    {
+        public string type;
+        public float[] position;
+        public float[] rotation;
+    }
     public void moveToHome()
     {
         UpdateJointStatus("Going to home...", Color.yellow);
-        wsWorker.SendCommand("home");
+        ServerMsg msg = new ServerMsg
+        {
+            type = "home",
+        };
+
+        string json = JsonUtility.ToJson(msg);
+        wsWorker.SendCommand(json);
     }
 
     public void pointerOut()

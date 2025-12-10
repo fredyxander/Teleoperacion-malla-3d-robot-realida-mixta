@@ -149,7 +149,7 @@ public class AnchorPlacementController : MonoBehaviour
         Quaternion yawOnly = Quaternion.LookRotation(fwd, Vector3.up);
 
         // 2) Esta es la rotación necesaria para dejar al robot de pie
-        Quaternion upright = Quaternion.Euler(-90, 0, 0);
+        Quaternion upright = Quaternion.Euler(-90, 180, 0);
 
         // 3) Combinamos: primero upright, luego yaw
         Quaternion worldRot = yawOnly * upright;

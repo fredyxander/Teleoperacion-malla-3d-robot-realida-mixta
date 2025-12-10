@@ -9,14 +9,15 @@ import rtde_receive
 # -----------------------------------------------------
 # CONFIGURACIÓN ROBOT
 # -----------------------------------------------------
-ROBOT_IP = "192.168.0.4"
+ROBOT_IP = "192.168.0.11"
 RTDE_PORT = 30004
 SOCKET_PORT = 30002
 
 # -----------------------------------------------------
 # CARGAR CADENA IKPY (URDF)
 # -----------------------------------------------------
-URDF_PATH = "robot_models/ur3_no_gripper.urdf"
+# URDF_PATH = "robot_models/ur3_zyyyzy.urdf"
+URDF_PATH = "robot_models/ur3.urdf"
 # Cargar URDF con versión de IKPy que no soporta argumentos extra
 ur3_chain = Chain.from_urdf_file(URDF_PATH)
 
@@ -98,28 +99,15 @@ def wait_robot_stopped(threshold=0.001):
 
 
 # -----------------------------------------------------
-# POSICIÓN SEGURA DE ALINEACIÓN
+# POSICIÓN DE ALINEACIÓN
 # -----------------------------------------------------
-SAFE_ALIGN_Q = [
-    0.0,
-    -math.pi/2,
-    0.0,
-    -math.pi/2,
-    0.0,
-    0.0
-]
 HOME_POINT_CMD = "movej([0, -1.57, 0, -1.57, 0, 0], a=1.0, v=0.5)\n"
 
 def move_safe_align():
     print("\n[SAFE] Moviendo a ALIGN SAFE POSE...")
-    # cmd = (
-    #     f"movej([{','.join(map(str,SAFE_ALIGN_Q))}], a=0.5, v=0.2)\n"
-    # )
-    # sock.send(cmd.encode())
     sock.send(HOME_POINT_CMD.encode())
     wait_robot_stopped()
     print("[SAFE] Robot en pose segura.\n")
-
 
 # -----------------------------------------------------
 # MOVIMIENTO CARTESIANO SUAVE (trayectoria A → B)
@@ -134,9 +122,16 @@ def move_cartesian_smooth(target_xyz, steps=60):
     """
 
     print("=== MOVIMIENTO SUAVE CON ORIENTACIÓN FIJA ===")
+    # Transformación URDF → URSim
+    target_converted = np.array([
+        -target_xyz[0], # Invertir eje X
+        -target_xyz[1], # Invertir eje Y
+        target_xyz[2]
+    ])
+
 
     p_start = get_tcp_real()
-    p_end = np.array(target_xyz)
+    p_end = np.array(target_converted)
 
     print(f"Posición inicial (TCP): {p_start}")
     print(f"Target deseado       : {p_end}")
@@ -173,11 +168,11 @@ def move_cartesian_smooth(target_xyz, steps=60):
 
     # Evaluación final del movimiento
     tcp_final = get_tcp_real()
-    err = tcp_final - p_end
+    err = tcp_final - np.array(target_xyz)
 
     print("\n===== FIN MOVIMIENTO SUAVE =====")
     print("TCP REAL FINAL:", tcp_final)
-    print("TARGET:", p_end)
+    print("TARGET:", np.array(target_xyz))
     print(f"ERROR FINAL: dx={err[0]:.4f}, dy={err[1]:.4f}, dz={err[2]:.4f}")
     print("================================\n")
 
@@ -187,7 +182,10 @@ def move_cartesian_smooth(target_xyz, steps=60):
 # =====================================================
 if __name__ == "__main__":
 
-    move_safe_align()
+    tcp_pos = get_tcp_real()
+    print(f"[UR] TCP INICIAL (pos): {tcp_pos}")
+
+    # move_safe_align()
 
     print("\n=== CONTROL CARTESIANO MULTI-TARGET ===")
     print("Ingresa coordenadas X Y Z en metros (UR frame).")
@@ -212,4 +210,3 @@ if __name__ == "__main__":
 
     print("\n[UR] Socket cerrado.")
     sock.close()
-
